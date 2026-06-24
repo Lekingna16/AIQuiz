@@ -1,0 +1,51 @@
+# ============================================
+# Docker Compose - Khởi chạy MongoDB cho development
+# ============================================
+#
+# Tại sao dùng Docker cho MongoDB thay vì cài trực tiếp?
+# 1. Không cần cài MongoDB trên máy → tránh xung đột version
+# 2. Một lệnh `docker compose up` là có DB sẵn sàng
+# 3. Dễ reset data: xóa volume → data mới hoàn toàn
+# 4. Đồng nhất giữa các developer → "works on my machine" ✅
+#
+# Cách dùng:
+#   docker compose up -d       → Chạy MongoDB ở background
+#   docker compose down        → Dừng MongoDB
+#   docker compose down -v     → Dừng + XÓA data (reset hoàn toàn)
+#   docker compose logs mongo  → Xem logs
+
+services:
+  # --- MongoDB ---
+  mongo:
+    image: mongo:7             # MongoDB 7.x (latest stable)
+    container_name: aiquiz-mongo
+    ports:
+      - "27017:27017"          # Map port: host:container
+    volumes:
+      # Named volume: data persists khi restart container
+      # Không dùng bind mount vì MongoDB cần quyền write đặc biệt
+      - mongo_data:/data/db
+    environment:
+      # Không set MONGO_INITDB_ROOT_USERNAME/PASSWORD cho dev
+      # → Kết nối không cần auth: mongodb://localhost:27017
+      # Production: BẮT BUỘC phải set username/password
+      MONGO_INITDB_DATABASE: aiquiz    # Tạo sẵn database
+    restart: unless-stopped            # Tự restart nếu crash
+
+  # --- Mongo Express (Optional: Web UI cho MongoDB) ---
+  mongo-express:
+    image: mongo-express:1
+    container_name: aiquiz-mongo-ui
+    ports:
+      - "8081:8081"            # Truy cập: http://localhost:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
+      ME_CONFIG_BASICAUTH: "false"   # Không cần login (chỉ dev)
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+    # Docker tự quản lý volume này
+    # Xem vị trí: docker volume inspect aiquiz_mongo_data

@@ -1,0 +1,22 @@
+# Environment variables (QUAN TRỌNG - không commit API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Uploads (file user upload)
+uploads/
