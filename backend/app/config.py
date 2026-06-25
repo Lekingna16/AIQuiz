@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # --- Google Gemini ---
     # API Key lấy từ: https://aistudio.google.com/apikey
-    GEMINI_API_KEY: str
+    DEEPSEEK_API_KEY: str
 
     # --- File Upload ---
     # Giới hạn kích thước file upload (đơn vị: MB)

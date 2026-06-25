@@ -13,11 +13,44 @@ FastAPI APIRouter hoạt động giống "mini FastAPI app":
 - Sau đó include vào main app
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+import logging
 
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from app.config import get_settings
+from app.database import get_db
 from app.models.document import DocumentResponse
 from app.models.quiz import QuizResponse, Difficulty
+from app.services.ai_service import (
+    DeepSeekService,
+    DeepSeekServiceError,
+    QuizGenerationError,
+    APIConnectionError,
+)
+from app.services.quiz_service import QuizService
 
+logger = logging.getLogger(__name__)
+
+
+# ============================================
+# CONSTANTS
+# ============================================
+
+# Các loại file được phép upload
+ALLOWED_EXTENSIONS = {"pdf", "docx", "txt"}
+
+# MIME type mapping (validate cả extension và content-type)
+ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+}
+
+
+# ============================================
+# ROUTER
+# ============================================
 
 # Tạo router với prefix "/api/documents"
 # Tất cả routes trong file này sẽ bắt đầu bằng /api/documents
@@ -27,16 +60,74 @@ router = APIRouter(
 )
 
 
+# ============================================
+# HELPERS
+# ============================================
+
+def _get_file_extension(filename: str) -> str:
+    """Extract file extension từ filename (lowercase, không có dấu chấm)."""
+    if not filename or "." not in filename:
+        return ""
+    return filename.rsplit(".", 1)[-1].lower()
+
+
+def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:
+    """
+    Validate file upload.
+
+    Không thể dùng async vì cần đọc file_bytes trước.
+    Được gọi sau khi đã read content.
+
+    Returns: (file_extension, ) — file_bytes được đọc ở caller
+    """
+    # Validate filename
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Filename is required.",
+        )
+
+    # Validate extension
+    ext = _get_file_extension(file.filename)
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"File type '.{ext}' is not supported. "
+                f"Allowed types: {', '.join('.' + e for e in sorted(ALLOWED_EXTENSIONS))}"
+            ),
+        )
+
+    return ext
+
+
+# ============================================
+# ENDPOINTS
+# ============================================
+
 @router.post(
     "/upload",
-    response_model=dict,  # Sẽ cập nhật response model ở Phase 2
+    response_model=dict,
     status_code=200,
     summary="Upload document & generate quiz",
     description="""
     Upload file PDF/DOCX/TXT → Extract text → Gemini AI sinh câu hỏi.
     
     Flow: File → Validate → Extract Text → AI Generate → Save DB → Response
+    
+    **Giới hạn:**
+    - File tối đa 10MB
+    - Hỗ trợ: .pdf, .docx, .txt
+    - Số câu hỏi: 5-30
+    
+    **Response** trả về quiz với danh sách câu hỏi (KHÔNG kèm đáp án).
     """,
+    responses={
+        400: {"description": "File type not supported / Invalid input"},
+        413: {"description": "File too large (max 10MB)"},
+        422: {"description": "Could not extract text from file"},
+        503: {"description": "AI service unavailable"},
+    },
 )
 async def upload_document(
     file: UploadFile = File(
@@ -57,25 +148,96 @@ async def upload_document(
         default="vi",
         description="Ngôn ngữ câu hỏi (vi, en)",
     ),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
-    Endpoint chính của app - Upload file và sinh quiz.
-    
-    Sẽ implement đầy đủ ở Phase 2. Hiện tại trả về stub response
-    để verify routing hoạt động.
+    Endpoint chính: Upload file → Extract text → AI sinh quiz.
+
+    Pipeline hoàn chỉnh xử lý từ file bytes đến quiz data.
     """
-    # --- Stub response (Phase 1) ---
-    # Phase 2 sẽ thay bằng logic thực:
-    # 1. Validate file type & size
-    # 2. Extract text
-    # 3. Call Gemini API
-    # 4. Save to MongoDB
-    # 5. Return quiz data
-    return {
-        "message": "Upload endpoint ready",
-        "filename": file.filename,
-        "num_questions": num_questions,
-        "difficulty": difficulty,
-        "language": language,
-        "status": "stub - will be implemented in Phase 2",
-    }
+    settings = get_settings()
+
+    # =====================
+    # Step 1: Validate file type (trước khi đọc content)
+    # =====================
+    file_ext = _validate_file(file, settings.MAX_FILE_SIZE_BYTES)
+
+    # =====================
+    # Step 2: Read file content & validate size
+    # =====================
+    try:
+        file_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to read uploaded file: {str(e)}",
+        )
+
+    if len(file_bytes) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file is empty.",
+        )
+
+    if len(file_bytes) > settings.MAX_FILE_SIZE_BYTES:
+        size_mb = len(file_bytes) / (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"File size ({size_mb:.1f}MB) exceeds the "
+                f"{settings.MAX_FILE_SIZE_MB}MB limit."
+            ),
+        )
+
+    # =====================
+    # Step 3: Initialize services & run pipeline
+    # =====================
+    try:
+        ai_service = DeepSeekService(api_key=settings.DEEPSEEK_API_KEY)
+        quiz_service = QuizService(db=db, gemini_service=ai_service)
+
+        result = await quiz_service.upload_and_generate_quiz(
+            file_bytes=file_bytes,
+            filename=file.filename,
+            file_type=file_ext,
+            num_questions=num_questions,
+            difficulty=difficulty.value,
+            language=language,
+        )
+
+        return result
+
+    except ValueError as e:
+        # Text extraction / validation errors
+        raise HTTPException(status_code=422, detail=str(e))
+
+    except QuizGenerationError as e:
+        # AI response format errors
+        logger.error(f"Quiz generation error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI could not generate valid questions: {str(e)}",
+        )
+
+    except APIConnectionError as e:
+        # Gemini API connection errors
+        logger.error(f"DeepSeek API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI service temporarily unavailable: {str(e)}",
+        )
+
+    except DeepSeekServiceError as e:
+        # Generic DeepSeek errors
+        logger.error(f"DeepSeek service error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="AI service error. Please try again later.",
+        )
+
+    except Exception as e:
+        logger.exception(f"Unexpected error in upload: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred. Please try again.",
+        )

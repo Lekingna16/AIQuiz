@@ -366,14 +366,14 @@ class GeminiService:
 
 ## 5. Lộ trình phát triển (Roadmap)
 
-### Phase 1: Foundation Setup (2-3 ngày)
+### Phase 1: Foundation Setup ✅
 
 - [x] Init Git repo
-- [ ] Setup FastAPI project structure
-- [ ] Setup MongoDB connection (Motor async driver)
-- [ ] Config management (Pydantic Settings, `.env`)
-- [ ] Setup React (Vite) + routing
-- [ ] Docker Compose cho MongoDB
+- [x] Setup FastAPI project structure
+- [x] Setup MongoDB connection (Motor async driver)
+- [x] Config management (Pydantic Settings, `.env`)
+- [x] Setup React (Vite) + routing
+- [x] Docker Compose cho MongoDB
 
 ```
 backend/
@@ -419,14 +419,14 @@ frontend/
 └── Dockerfile
 ```
 
-### Phase 2: Core Backend Logic (3-4 ngày)
+### Phase 2: Core Backend Logic ✅
 
-- [ ] Text Extraction service (PDF, DOCX, TXT)
-- [ ] Text preprocessing & chunking utility
-- [ ] Gemini API integration + prompt engineering
-- [ ] JSON validation & retry logic
-- [ ] Upload endpoint + Quiz generation pipeline
-- [ ] Unit tests cho extraction & parsing
+- [x] Text Extraction service (PDF, DOCX, TXT)
+- [x] Text preprocessing & chunking utility
+- [x] Gemini API integration + prompt engineering
+- [x] JSON validation & retry logic
+- [x] Upload endpoint + Quiz generation pipeline
+- [x] Unit tests cho extraction & parsing (58 tests passed)
 
 ### Phase 3: Full API + Database (2-3 ngày)
 
