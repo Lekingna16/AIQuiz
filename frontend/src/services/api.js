@@ -22,11 +22,36 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 // Tạo axios instance với config chung
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 120000, // 120 giây (upload + AI generation cần thời gian)
+  timeout: 600000, // 600 giây (10 phút) để xử lý file lớn
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+/**
+ * Request Interceptor - Gắn Token vào Header
+ * Trước khi gửi bất kỳ request nào, tự động lấy token từ Zustand
+ * và gắn vào header Authorization.
+ */
+api.interceptors.request.use(
+  (config) => {
+    // Không thể import trực tiếp hook useAuthStore ở đây vì sẽ gây React hook error ngoài component
+    // Đọc trực tiếp từ localStorage
+    const authData = localStorage.getItem('auth-storage');
+    if (authData) {
+      try {
+        const { state } = JSON.parse(authData);
+        if (state.token) {
+          config.headers.Authorization = `Bearer ${state.token}`;
+        }
+      } catch (e) {
+        // Parse error, ignore
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 /**
  * Response Interceptor - xử lý lỗi tập trung.
@@ -70,6 +95,7 @@ export const uploadDocument = async (file, options = {}) => {
   if (options.num_questions) params.append("num_questions", options.num_questions);
   if (options.difficulty) params.append("difficulty", options.difficulty);
   if (options.language) params.append("language", options.language);
+  if (options.mode) params.append("mode", options.mode);
 
   const response = await api.post(
     `/api/documents/upload?${params.toString()}`,
@@ -106,6 +132,23 @@ export const submitQuiz = async (quizId, answers) => {
   const response = await api.post(`/api/quizzes/${quizId}/submit`, {
     answers,
   });
+  return response.data;
+};
+
+/**
+ * Authenticate với Google
+ * @param {string} credential - JWT token từ Google
+ */
+export const loginWithGoogle = async (credential) => {
+  const response = await api.post('/api/auth/google', { credential });
+  return response.data;
+};
+
+/**
+ * Lấy thông tin user hiện tại
+ */
+export const getMe = async () => {
+  const response = await api.get('/api/auth/me');
   return response.data;
 };
 

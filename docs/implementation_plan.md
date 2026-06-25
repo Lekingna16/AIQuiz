@@ -428,23 +428,23 @@ frontend/
 - [x] Upload endpoint + Quiz generation pipeline
 - [x] Unit tests cho extraction & parsing (58 tests passed)
 
-### Phase 3: Full API + Database (2-3 ngày)
+### Phase 3: Full API + Database ✅
 
-- [ ] CRUD endpoints cho Quizzes
-- [ ] Submit quiz + scoring logic
-- [ ] Quiz history + pagination
-- [ ] Error handling middleware
-- [ ] Input validation (file size, type)
-- [ ] API documentation (auto-generated Swagger)
+- [x] CRUD endpoints cho Quizzes
+- [x] Submit quiz + scoring logic
+- [x] Quiz history + pagination
+- [x] Error handling middleware
+- [x] Input validation (file size, type)
+- [x] API documentation (auto-generated Swagger)
 
-### Phase 4: Frontend Integration (3-4 ngày)
+### Phase 4: Frontend Integration ✅
 
-- [ ] File upload component (drag & drop)
-- [ ] Loading states + progress indicator
-- [ ] Quiz player interface (navigation, timer optional)
-- [ ] Results page (score, corrections, explanations)
-- [ ] Quiz history page
-- [ ] Responsive design + dark mode
+- [x] File upload component (drag & drop)
+- [x] Loading states + progress indicator
+- [x] Quiz player interface (navigation, timer optional)
+- [x] Results page (score, corrections, explanations)
+- [x] Quiz history page
+- [x] Responsive design + dark mode
 
 ### Phase 5: Polish & Deploy (2-3 ngày)
 

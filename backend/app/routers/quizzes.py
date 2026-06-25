@@ -8,13 +8,21 @@ Endpoints:
 - POST /api/quizzes/{id}/submit → Nộp bài và chấm điểm
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Dict, Any
+from bson import ObjectId
+from fastapi import APIRouter, HTTPException, Query, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
+import math
+from datetime import datetime, timezone
 
+from app.database import get_db
 from app.models.quiz import (
     QuizResponse,
     QuizSummaryResponse,
     QuizSubmitRequest,
     QuizSubmitResponse,
+    QuestionResponse,
+    AnswerResult,
 )
 
 
@@ -33,17 +41,34 @@ router = APIRouter(
 async def list_quizzes(
     page: int = Query(default=1, ge=1, description="Trang hiện tại"),
     limit: int = Query(default=10, ge=1, le=50, description="Số quiz/trang"),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
     Trả về danh sách quiz tóm tắt (không kèm câu hỏi).
-    Sẽ implement query MongoDB ở Phase 3.
     """
+    skip = (page - 1) * limit
+    
+    total = await db.quizzes.count_documents({})
+    
+    cursor = db.quizzes.find({}).sort("created_at", -1).skip(skip).limit(limit)
+    quizzes_db = await cursor.to_list(length=limit)
+    
+    quizzes = []
+    for q in quizzes_db:
+        quizzes.append({
+            "id": str(q["_id"]),
+            "title": q["title"],
+            "description": q.get("description", ""),
+            "total_questions": q["total_questions"],
+            "difficulty": q["difficulty"],
+            "created_at": q["created_at"].isoformat(),
+        })
+        
     return {
-        "quizzes": [],
-        "total": 0,
+        "quizzes": quizzes,
+        "total": total,
         "page": page,
-        "pages": 0,
-        "status": "stub - will be implemented in Phase 3",
+        "pages": math.ceil(total / limit) if limit else 0,
     }
 
 
@@ -53,14 +78,36 @@ async def list_quizzes(
     summary="Get quiz for taking",
     description="Lấy chi tiết quiz để làm bài. KHÔNG trả về đáp án đúng.",
 )
-async def get_quiz(quiz_id: str):
+async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
     """
     Trả quiz với câu hỏi (ẩn đáp án).
-    Phase 3: query MongoDB, map sang QuestionResponse (không có correct_answer).
     """
+    if not ObjectId.is_valid(quiz_id):
+        raise HTTPException(status_code=400, detail="Invalid quiz ID")
+        
+    quiz = await db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    questions_cursor = db.questions.find({"quiz_id": quiz_id}).sort("order", 1)
+    questions = await questions_cursor.to_list(length=100)
+    
     return {
-        "message": f"Quiz {quiz_id} endpoint ready",
-        "status": "stub - will be implemented in Phase 3",
+        "id": str(quiz["_id"]),
+        "title": quiz["title"],
+        "description": quiz.get("description", ""),
+        "total_questions": quiz["total_questions"],
+        "difficulty": quiz["difficulty"],
+        "created_at": quiz["created_at"].isoformat(),
+        "questions": [
+            {
+                "id": str(q["_id"]),
+                "question_text": q["question_text"],
+                "options": q["options"],
+                "order": q["order"],
+            }
+            for q in questions
+        ]
     }
 
 
@@ -70,13 +117,97 @@ async def get_quiz(quiz_id: str):
     summary="Submit quiz answers",
     description="Nộp bài làm, server chấm điểm và trả kết quả chi tiết.",
 )
-async def submit_quiz(quiz_id: str, payload: QuizSubmitRequest):
+async def submit_quiz(
+    quiz_id: str, 
+    payload: QuizSubmitRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
     """
     Nhận answers → so sánh với correct_answer trong DB → trả kết quả.
-    Phase 3: implement scoring logic.
     """
-    return {
-        "message": f"Submit for quiz {quiz_id} endpoint ready",
-        "answers_received": len(payload.answers),
-        "status": "stub - will be implemented in Phase 3",
+    if not ObjectId.is_valid(quiz_id):
+        raise HTTPException(status_code=400, detail="Invalid quiz ID")
+        
+    quiz = await db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    # Lấy tất cả câu hỏi của quiz
+    questions_cursor = db.questions.find({"quiz_id": quiz_id})
+    questions = await questions_cursor.to_list(length=100)
+    
+    if not questions:
+        raise HTTPException(status_code=404, detail="No questions found for this quiz")
+        
+    # Tạo map question_id -> question_data
+    question_map = {str(q["_id"]): q for q in questions}
+    
+    score = 0
+    results = []
+    
+    for answer in payload.answers:
+        q_id = answer.question_id
+        selected = answer.selected
+        
+        if q_id not in question_map:
+            continue
+            
+        q_data = question_map[q_id]
+        correct_answer = q_data["correct_answer"]
+        is_correct = (selected == correct_answer)
+        
+        if is_correct:
+            score += 1
+            
+        results.append({
+            "question_id": q_id,
+            "selected": selected,
+            "correct_answer": correct_answer,
+            "is_correct": is_correct,
+            "explanation": q_data.get("explanation", ""),
+        })
+        
+    total = len(questions)
+    percentage = (score / total) * 100 if total > 0 else 0
+    
+    # Optional: Lưu kết quả làm bài vào quiz_attempts collection
+    attempt_doc = {
+        "quiz_id": ObjectId(quiz_id),
+        "user_id": None, # Will be updated in Phase 5 with auth
+        "answers": [{"question_id": ObjectId(a.question_id), "selected": a.selected} for a in payload.answers],
+        "score": score,
+        "total": total,
+        "completed_at": datetime.now(timezone.utc)
     }
+    await db.quiz_attempts.insert_one(attempt_doc)
+    
+    return {
+        "score": score,
+        "total": total,
+        "percentage": round(percentage, 2),
+        "results": results
+    }
+
+
+@router.delete(
+    "/{quiz_id}",
+    summary="Delete a quiz",
+    description="Xóa quiz và tất cả câu hỏi liên quan khỏi database.",
+)
+async def delete_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+    """
+    Xóa quiz.
+    """
+    if not ObjectId.is_valid(quiz_id):
+        raise HTTPException(status_code=400, detail="Invalid quiz ID")
+        
+    result = await db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    # Xóa các câu hỏi liên quan
+    await db.questions.delete_many({"quiz_id": quiz_id})
+    # Xóa các attempts liên quan
+    await db.quiz_attempts.delete_many({"quiz_id": ObjectId(quiz_id)})
+    
+    return {"message": "Quiz deleted successfully"}

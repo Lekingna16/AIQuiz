@@ -7,7 +7,8 @@
  */
 
 import { Link } from "react-router-dom";
-import { Upload, Brain, CheckCircle, FileText } from "lucide-react";
+import { Brain, CheckCircle, FileText } from "lucide-react";
+import FileUpload from "../components/FileUpload";
 
 function HomePage() {
   return (
@@ -26,12 +27,8 @@ function HomePage() {
             Hỗ trợ PDF, Word, TXT. Powered by Google Gemini AI.
           </p>
 
-          {/* Upload Area - Placeholder cho Phase 4 */}
-          <div className="upload-area">
-            <Upload size={40} />
-            <p>Kéo thả file vào đây hoặc click để chọn</p>
-            <span className="upload-hint">PDF, DOCX, TXT — Tối đa 10MB</span>
-          </div>
+          {/* Upload Area Component */}
+          <FileUpload />
 
           <Link to="/history" className="btn btn-secondary">
             Xem lịch sử quiz

@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     # Giới hạn kích thước file upload (đơn vị: MB)
     MAX_FILE_SIZE_MB: int = 10
 
+    # --- Authentication ---
+    # Google OAuth2 Client ID
+    GOOGLE_CLIENT_ID: str = "YOUR_GOOGLE_CLIENT_ID"
+    # Khóa bí mật dùng để sign JWT (Nên đổi trong production)
+    JWT_SECRET_KEY: str = "super-secret-key-change-this-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
     # --- CORS ---
     # URL của frontend để cấu hình Cross-Origin Resource Sharing
     # React dev server mặc định chạy port 5173 (Vite)

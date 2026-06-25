@@ -148,6 +148,10 @@ async def upload_document(
         default="vi",
         description="Ngôn ngữ câu hỏi (vi, en)",
     ),
+    mode: str = Query(
+        default="generate",
+        description="Chế độ xử lý: generate (sinh câu mới) hoặc extract (trích xuất và lọc trùng)",
+    ),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -203,6 +207,7 @@ async def upload_document(
             num_questions=num_questions,
             difficulty=difficulty.value,
             language=language,
+            mode=mode,
         )
 
         return result

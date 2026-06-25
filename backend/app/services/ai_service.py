@@ -38,23 +38,18 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# SYSTEM PROMPT - Linh hồn của AI Quiz Generator
-# ============================================
+SYSTEM_PROMPT_GENERATE = """You are an expert educational assessment designer. 
 
-SYSTEM_PROMPT = """You are an expert educational assessment designer. Your task is to generate high-quality multiple-choice questions (MCQs) based STRICTLY on the provided source material.
+## TASK
+Your task is to GENERATE exactly {num_questions} high-quality multiple-choice questions (MCQs) based STRICTLY on the source material at {difficulty} difficulty level.
 
 ## RULES (MUST FOLLOW):
 1. **Factual accuracy**: Every question and answer MUST be directly supported by the source text. NEVER fabricate or infer information not present in the source.
 2. **Distractors**: Wrong answers must be plausible and logically related to the topic, but clearly incorrect based on the source material. Avoid absurd or obviously wrong options.
-3. **Coverage**: Distribute questions across different sections/topics of the source material evenly. Do not cluster questions from one section.
+3. **Coverage**: Distribute them across different sections/topics of the source material evenly.
 4. **Clarity**: Questions must be unambiguous with exactly ONE correct answer. Avoid "all of the above" or "none of the above" options.
-5. **Difficulty**: Follow the requested difficulty level:
-   - easy: Direct recall/definition questions
-   - medium: Understanding/application questions
-   - hard: Analysis/synthesis/evaluation questions
-   - mixed: Blend of all difficulty levels
-6. **Language**: Generate ALL content (questions, options, explanations) in {language}.
-7. **Explanations**: Each explanation should briefly reference the relevant part of the source material.
+5. **Language**: Generate ALL content (questions, options, explanations) in {language}.
+6. **Explanations**: Each explanation should briefly reference the relevant part of the source material or explain why the answer is correct.
 
 ## OUTPUT FORMAT (STRICT JSON):
 Return ONLY a valid JSON object. No markdown, no code fences, no extra text before or after.
@@ -76,8 +71,41 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
     }}
   ]
 }}
+"""
 
-Generate exactly {num_questions} questions at {difficulty} difficulty level.
+SYSTEM_PROMPT_EXTRACT = """You are an expert data extractor.
+
+## TASK
+The source material ALREADY contains a list of multiple-choice questions. Your task is to EXTRACT them. 
+IMPORTANT: You MUST filter out and REMOVE any DUPLICATE questions (questions that ask the same thing or have identical text).
+
+## RULES (MUST FOLLOW):
+1. **Extraction only**: Do not create new questions. Only extract what is present in the source material.
+2. **Deduplication**: If a question appears multiple times, keep only ONE version of it.
+3. **Language**: Output ALL content in {language}. Provide translations if necessary.
+4. **Format options correctly**: Ensure each question has exactly 4 options (A, B, C, D) and one correct answer.
+5. **Solve missing answers**: If the source material does NOT provide the correct answer or explanation for an extracted question, YOU MUST SOLVE IT yourself based on your knowledge and provide the correct_answer and a brief explanation.
+
+## OUTPUT FORMAT (STRICT JSON):
+Return ONLY a valid JSON object. No markdown, no code fences, no extra text before or after.
+
+{{
+  "title": "A descriptive quiz title based on the document content",
+  "description": "A brief 1-2 sentence description of what the quiz covers",
+  "questions": [
+    {{
+      "question_text": "Clear, specific question?",
+      "options": [
+        {{"key": "A", "text": "First option"}},
+        {{"key": "B", "text": "Second option"}},
+        {{"key": "C", "text": "Third option"}},
+        {{"key": "D", "text": "Fourth option"}}
+      ],
+      "correct_answer": "A",
+      "explanation": "Brief explanation referencing the source material."
+    }}
+  ]
+}}
 """
 
 
@@ -143,6 +171,7 @@ class DeepSeekService:
         num_questions: int = 10,
         difficulty: str = "mixed",
         language: str = "vi",
+        mode: str = "generate",
     ) -> dict:
         """
         Sinh bộ câu hỏi trắc nghiệm từ nội dung văn bản.
@@ -152,6 +181,7 @@ class DeepSeekService:
             num_questions: Số câu hỏi cần tạo (5-30)
             difficulty: Mức độ khó (easy/medium/hard/mixed)
             language: Ngôn ngữ output (vi/en)
+            mode: "generate" hoặc "extract"
 
         Returns:
             Dict chứa title, description, questions
@@ -161,11 +191,14 @@ class DeepSeekService:
             APIConnectionError: Nếu không kết nối được DeepSeek API
         """
         # Build prompt từ template
-        system_prompt = SYSTEM_PROMPT.format(
-            language=language,
-            num_questions=num_questions,
-            difficulty=difficulty,
-        )
+        if mode == "extract":
+            system_prompt = SYSTEM_PROMPT_EXTRACT.format(language=language)
+        else:
+            system_prompt = SYSTEM_PROMPT_GENERATE.format(
+                language=language,
+                num_questions=num_questions,
+                difficulty=difficulty,
+            )
 
         # Gọi API với retry logic
         response_text = await self._call_api_with_retry(system_prompt, text)
@@ -173,12 +206,15 @@ class DeepSeekService:
         # Parse và validate response
         quiz_data = self._parse_response(response_text)
 
-        # Validate số câu hỏi
+        # Validate số câu hỏi (chỉ cảnh báo nếu ở chế độ generate)
         actual_count = len(quiz_data.get("questions", []))
         if actual_count == 0:
-            raise QuizGenerationError("AI generated 0 questions")
+            # Ghi log text ra file để debug
+            with open("failed_extracted_text.log", "w", encoding="utf-8") as f:
+                f.write(text)
+            raise QuizGenerationError("AI generated 0 questions (Extracted text saved to failed_extracted_text.log)")
 
-        if actual_count != num_questions:
+        if mode == "generate" and actual_count != num_questions:
             logger.warning(
                 f"Requested {num_questions} questions, got {actual_count}"
             )
@@ -222,7 +258,7 @@ class DeepSeekService:
                     temperature=0.3,  # Low temp → consistent, factual output
                     max_tokens=8192,
                 ),
-                timeout=120,  # 120 giây timeout (DeepSeek có thể chậm hơn)
+                timeout=300,  # Tăng lên 300s cho các file lớn
             )
 
             content = response.choices[0].message.content
@@ -236,7 +272,7 @@ class DeepSeekService:
 
         except asyncio.TimeoutError:
             raise APIConnectionError(
-                "DeepSeek API timeout after 120 seconds. "
+                "DeepSeek API timeout after 300 seconds. "
                 "The document might be too long or the API is overloaded."
             )
         except Exception as e:
@@ -278,6 +314,24 @@ class DeepSeekService:
 
         # Step 3: Validate structure
         self._validate_quiz_structure(data)
+
+        # Step 4: Deduplicate questions as a fallback
+        import string
+        unique_questions = []
+        seen_texts = set()
+        
+        for q in data.get("questions", []):
+            # Chuẩn hóa text: chuyển chữ thường, xóa khoảng trắng thừa và dấu câu
+            normalized = q["question_text"].lower().strip()
+            normalized = normalized.translate(str.maketrans('', '', string.punctuation))
+            
+            if normalized not in seen_texts:
+                seen_texts.add(normalized)
+                unique_questions.append(q)
+            else:
+                logger.info(f"Filtered out duplicate question: {q['question_text']}")
+                
+        data["questions"] = unique_questions
 
         return data
 

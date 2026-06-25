@@ -23,12 +23,13 @@ Sau khi chạy, truy cập:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import Database
-from app.routers import documents, quizzes
+from app.routers import documents, quizzes, auth
 
 
 # ============================================
@@ -114,6 +115,7 @@ app.add_middleware(
     allow_origins=[
         settings.FRONTEND_URL,  # React dev server
         "http://localhost:5173",  # Backup nếu env chưa set
+        "http://127.0.0.1:5173",  # Handle cases where user visits 127.0.0.1
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Cho phép tất cả methods
@@ -132,6 +134,24 @@ Mỗi router đã có prefix riêng:
 """
 app.include_router(documents.router)
 app.include_router(quizzes.router)
+app.include_router(auth.router)
+
+
+# ============================================
+# ERROR HANDLING MIDDLEWARE
+# ============================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler for unexpected errors.
+    Returns a standardized 500 JSON response instead of a raw traceback.
+    """
+    # In a real app, you would log the traceback here using logging
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again later."},
+    )
 
 
 # ============================================

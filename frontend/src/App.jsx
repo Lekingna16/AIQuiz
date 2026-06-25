@@ -20,6 +20,8 @@ import HomePage from "./pages/HomePage";
 import QuizPage from "./pages/QuizPage";
 import HistoryPage from "./pages/HistoryPage";
 
+import Header from "./components/Header";
+
 function App() {
   return (
     <BrowserRouter>
@@ -40,6 +42,8 @@ function App() {
           duration: 4000,
         }}
       />
+
+      <Header />
 
       <main className="app-container">
         <Routes>

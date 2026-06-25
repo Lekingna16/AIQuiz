@@ -77,6 +77,7 @@ class QuizService:
         num_questions: int = 10,
         difficulty: str = "mixed",
         language: str = "vi",
+        mode: str = "generate",
         user_id: str | None = None,
     ) -> dict:
         """
@@ -137,18 +138,68 @@ class QuizService:
             )
 
             # =====================
-            # Step 4: Generate quiz with AI
+            # Step 4: Generate/Extract quiz with AI
             # =====================
             logger.info(
-                f"Generating {num_questions} questions "
-                f"(difficulty={difficulty}, lang={language})"
+                f"Processing {num_questions} questions "
+                f"(difficulty={difficulty}, lang={language}, mode={mode})"
             )
-            quiz_data = await self.gemini.generate_quiz(
-                text=processed_text,
-                num_questions=num_questions,
-                difficulty=difficulty,
-                language=language,
-            )
+            
+            if mode == "extract":
+                # =============================================
+                # Trích xuất bằng REGEX
+                # → Nhanh (~50ms), chính xác, lấy hết 100% câu
+                # =============================================
+                from app.utils.question_parser import (
+                    parse_questions_from_text,
+                    deduplicate_questions,
+                )
+
+                logger.info("Using programmatic parser for extraction")
+                raw_questions = parse_questions_from_text(extracted_text)
+                logger.info(f"Parsed {len(raw_questions)} raw questions")
+
+                unique_questions = deduplicate_questions(raw_questions)
+                logger.info(f"After dedup: {len(unique_questions)} unique questions")
+
+                if not unique_questions:
+                    raise QuizGenerationError(
+                        "Không tìm thấy câu hỏi trắc nghiệm trong file. "
+                        "Hãy đảm bảo file có format: Câu 1: ... A. ... B. ... C. ... D. ..."
+                    )
+
+                # Kiểm tra và dùng AI để giải các câu không có đáp án
+                unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
+                if unsolved_questions:
+                    logger.info(f"Found {len(unsolved_questions)} questions without answers. Calling AI to solve them...")
+                    solved_questions = await self._solve_missing_answers_with_ai(unsolved_questions)
+                    
+                    # Merge solved answers back into unique_questions
+                    solved_map = {q["question_text"]: q for q in solved_questions}
+                    for q in unique_questions:
+                        if not q.get("correct_answer") and q["question_text"] in solved_map:
+                            solved_q = solved_map[q["question_text"]]
+                            q["correct_answer"] = solved_q.get("correct_answer", "")
+                            q["explanation"] = solved_q.get("explanation", "")
+
+                # Tạo title/description tự động
+                quiz_data = {
+                    "title": f"Trích xuất từ {filename}",
+                    "description": (
+                        f"Trích xuất {len(unique_questions)} câu hỏi duy nhất "
+                        f"(lọc từ {len(raw_questions)} câu gốc)"
+                    ),
+                    "questions": unique_questions,
+                }
+            else:
+                # Luôn dùng AI cho generate
+                quiz_data = await self.gemini.generate_quiz(
+                    text=processed_text,
+                    num_questions=num_questions,
+                    difficulty=difficulty,
+                    language=language,
+                    mode=mode,
+                )
 
             # =====================
             # Step 5: Save quiz + questions to DB
@@ -207,6 +258,56 @@ class QuizService:
         }
         result = await self.db.documents.insert_one(doc)
         return str(result.inserted_id)
+
+    async def _solve_missing_answers_with_ai(self, questions: list[dict]) -> list[dict]:
+        """
+        Gửi các câu hỏi thiếu đáp án lên AI để giải.
+        Chỉ gửi định dạng JSON thu gọn để tiết kiệm token và tăng tốc độ.
+        """
+        import json
+        
+        # Tạo payload rút gọn chỉ chứa text và options
+        payload = []
+        for q in questions:
+            payload.append({
+                "question_text": q["question_text"],
+                "options": q["options"]
+            })
+            
+        json_payload = json.dumps(payload, ensure_ascii=False, indent=2)
+        
+        system_prompt = """You are an expert educational AI.
+Your task is to SOLVE a given list of multiple-choice questions.
+
+## TASK
+I will provide you with a JSON array of questions and their options.
+For EACH question, you MUST determine the correct answer based on your knowledge.
+
+## RULES
+1. Determine the correct answer (must be one of: A, B, C, D).
+2. Provide a brief explanation for why it is correct.
+3. Return the exact same questions with 'correct_answer' and 'explanation' fields added.
+
+## OUTPUT FORMAT
+Return ONLY a valid JSON object matching this structure:
+{
+  "questions": [
+    {
+      "question_text": "...",
+      "correct_answer": "A",
+      "explanation": "..."
+    }
+  ]
+}
+"""
+        try:
+            # Gọi API DeepSeek
+            response_text = await self.gemini._call_api_with_retry(system_prompt, json_payload)
+            solved_data = self.gemini._parse_response(response_text)
+            return solved_data.get("questions", [])
+        except Exception as e:
+            logger.error(f"Failed to solve missing answers with AI: {e}")
+            return []
 
     async def _save_quiz_and_questions(
         self,
