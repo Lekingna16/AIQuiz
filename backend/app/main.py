@@ -113,7 +113,7 @@ allow_credentials: cho phép gửi cookies (cần cho auth)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        origin.strip() for origin in settings.FRONTEND_URL.split(",") if origin.strip()
+        origin.strip().rstrip("/") for origin in settings.FRONTEND_URL.split(",") if origin.strip()
     ] + [
         "http://localhost:5173",  # Backup nếu env chưa set
         "http://127.0.0.1:5173",  # Handle cases where user visits 127.0.0.1
