@@ -155,8 +155,7 @@ class AnswerSubmission(BaseModel):
 class QuizSubmitRequest(BaseModel):
     """Request body khi user nộp bài."""
     answers: list[AnswerSubmission] = Field(
-        ...,
-        min_length=1,
+        default_factory=list,
         description="Danh sách câu trả lời",
     )
 
@@ -164,7 +163,7 @@ class QuizSubmitRequest(BaseModel):
 class AnswerResult(BaseModel):
     """Kết quả 1 câu sau khi chấm."""
     question_id: str
-    selected: str         # User chọn gì
+    selected: str | None = None  # User chọn gì
     correct_answer: str   # Đáp án đúng
     is_correct: bool      # Đúng hay sai
     explanation: str      # Giải thích

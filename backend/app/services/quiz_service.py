@@ -35,6 +35,8 @@ Flow chi tiết:
 """
 
 import logging
+import json
+import re
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -149,6 +151,7 @@ class QuizService:
                 # =============================================
                 # Trích xuất bằng REGEX
                 # → Nhanh (~50ms), chính xác, lấy hết 100% câu
+                # Ưu tiên đáp án: inline > tô sẵn > bảng > AI
                 # =============================================
                 from app.utils.question_parser import (
                     parse_questions_from_text,
@@ -168,27 +171,73 @@ class QuizService:
                         "Hãy đảm bảo file có format: Câu 1: ... A. ... B. ... C. ... D. ..."
                     )
 
-                # Kiểm tra và dùng AI để giải các câu không có đáp án
+                # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
+                has_answer = [q for q in unique_questions if q.get("correct_answer")]
                 unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
+                
+                logger.info(
+                    f"Answer sources: {len(has_answer)} từ file "
+                    f"(inline/tô sẵn/bảng đáp án), "
+                    f"{len(unsolved_questions)} cần AI giải"
+                )
+
+                # Chỉ gọi AI cho những câu thực sự thiếu đáp án
+                ai_solved = 0
                 if unsolved_questions:
-                    logger.info(f"Found {len(unsolved_questions)} questions without answers. Calling AI to solve them...")
-                    solved_questions = await self._solve_missing_answers_with_ai(unsolved_questions)
+                    logger.info(f"Calling DeepSeek AI to solve {len(unsolved_questions)} questions...")
+                    solved_results = await self._solve_missing_answers_with_ai(unsolved_questions)
                     
-                    # Merge solved answers back into unique_questions
-                    solved_map = {q["question_text"]: q for q in solved_questions}
-                    for q in unique_questions:
-                        if not q.get("correct_answer") and q["question_text"] in solved_map:
-                            solved_q = solved_map[q["question_text"]]
-                            q["correct_answer"] = solved_q.get("correct_answer", "")
-                            q["explanation"] = solved_q.get("explanation", "")
+                    # Merge solved answers back bằng INDEX (không dùng text matching)
+                    for i, q in enumerate(unsolved_questions):
+                        solved_q = solved_results[i] if i < len(solved_results) else None
+                        if solved_q and solved_q is not None:
+                            answer = solved_q.get("correct_answer", "")
+                            explanation = solved_q.get("explanation", "")
+                            if answer and answer.upper() in {"A", "B", "C", "D"}:
+                                q["correct_answer"] = answer.upper()
+                                q["explanation"] = explanation
+                                ai_solved += 1
+                    
+                    logger.info(f"AI solved {ai_solved}/{len(unsolved_questions)} questions")
+
+                # Safety fallback: đảm bảo KHÔNG CÓ câu nào thiếu đáp án
+                still_missing = [q for q in unique_questions if not q.get("correct_answer")]
+                if still_missing:
+                    logger.warning(
+                        f"{len(still_missing)} questions still missing answers after AI. "
+                        f"Assigning 'A' as default."
+                    )
+                    for q in still_missing:
+                        q["correct_answer"] = "A"
+                        q["explanation"] = (
+                            "⚠️ Đáp án được gán mặc định (A) vì hệ thống không thể "
+                            "xác định đáp án đúng từ file gốc hoặc AI. "
+                            "Vui lòng kiểm tra lại."
+                        )
 
                 # Tạo title/description tự động
+                desc_parts = [
+                    f"Trích xuất {len(unique_questions)} câu hỏi duy nhất",
+                    f"(lọc từ {len(raw_questions)} câu gốc)",
+                ]
+                if has_answer and not unsolved_questions:
+                    desc_parts.append("• Tất cả đáp án từ file gốc")
+                elif unsolved_questions:
+                    if still_missing:
+                        desc_parts.append(
+                            f"• {len(has_answer)} đáp án từ file, "
+                            f"{ai_solved} đáp án từ AI, "
+                            f"{len(still_missing)} đáp án mặc định (cần kiểm tra)"
+                        )
+                    else:
+                        desc_parts.append(
+                            f"• {len(has_answer)} đáp án từ file, "
+                            f"{ai_solved} đáp án từ AI"
+                        )
+                    
                 quiz_data = {
                     "title": f"Trích xuất từ {filename}",
-                    "description": (
-                        f"Trích xuất {len(unique_questions)} câu hỏi duy nhất "
-                        f"(lọc từ {len(raw_questions)} câu gốc)"
-                    ),
+                    "description": " ".join(desc_parts),
                     "questions": unique_questions,
                 }
             else:
@@ -262,52 +311,104 @@ class QuizService:
     async def _solve_missing_answers_with_ai(self, questions: list[dict]) -> list[dict]:
         """
         Gửi các câu hỏi thiếu đáp án lên AI để giải.
-        Chỉ gửi định dạng JSON thu gọn để tiết kiệm token và tăng tốc độ.
+        Xử lý theo batch (30 câu/batch) để tránh timeout với file lớn.
+        
+        Returns: list of dicts with 'correct_answer' and 'explanation' 
+                 IN THE SAME ORDER as input questions.
         """
-        import json
+        import asyncio
         
-        # Tạo payload rút gọn chỉ chứa text và options
-        payload = []
-        for q in questions:
-            payload.append({
-                "question_text": q["question_text"],
-                "options": q["options"]
-            })
+        BATCH_SIZE = 30
+        # Khởi tạo mảng kết quả với cùng kích thước, mặc định rỗng
+        all_solved = [None] * len(questions)
+        
+        # Chia thành các batch, giữ track index gốc
+        batches = []
+        for i in range(0, len(questions), BATCH_SIZE):
+            batch_items = []
+            for j in range(i, min(i + BATCH_SIZE, len(questions))):
+                batch_items.append((j, questions[j]))
+            batches.append(batch_items)
+        
+        logger.info(f"Splitting {len(questions)} questions into {len(batches)} batches")
+        
+        for batch_idx, batch in enumerate(batches):
+            logger.info(f"Processing batch {batch_idx + 1}/{len(batches)} ({len(batch)} questions)")
             
-        json_payload = json.dumps(payload, ensure_ascii=False, indent=2)
-        
-        system_prompt = """You are an expert educational AI.
-Your task is to SOLVE a given list of multiple-choice questions.
+            # Tạo payload rút gọn, đánh số thứ tự rõ ràng
+            payload = []
+            for idx_in_batch, (original_idx, q) in enumerate(batch):
+                payload.append({
+                    "index": idx_in_batch + 1,  # 1-based cho AI dễ hiểu
+                    "question_text": q["question_text"],
+                    "options": q["options"]
+                })
+            json_payload = json.dumps(payload, ensure_ascii=False)
+            
+            system_prompt = f"""You are an expert educational AI.
+Your task is to SOLVE a given list of {len(batch)} multiple-choice questions.
 
 ## TASK
-I will provide you with a JSON array of questions and their options.
+I will provide you with a JSON array of {len(batch)} questions (each with an "index" field) and their options.
 For EACH question, you MUST determine the correct answer based on your knowledge.
 
-## RULES
-1. Determine the correct answer (must be one of: A, B, C, D).
-2. Provide a brief explanation for why it is correct.
-3. Return the exact same questions with 'correct_answer' and 'explanation' fields added.
+## CRITICAL RULES
+1. You MUST return EXACTLY {len(batch)} answers, one for each input question.
+2. You MUST preserve the "index" field from the input to match answers back.
+3. Determine the correct answer (must be one of: A, B, C, D).
+4. Provide a brief explanation for why it is correct.
+5. Return answers IN THE SAME ORDER as the input.
 
 ## OUTPUT FORMAT
 Return ONLY a valid JSON object matching this structure:
-{
+{{
   "questions": [
-    {
-      "question_text": "...",
+    {{
+      "index": 1,
       "correct_answer": "A",
       "explanation": "..."
-    }
+    }}
   ]
-}
+}}
 """
-        try:
-            # Gọi API DeepSeek
-            response_text = await self.gemini._call_api_with_retry(system_prompt, json_payload)
-            solved_data = self.gemini._parse_response(response_text)
-            return solved_data.get("questions", [])
-        except Exception as e:
-            logger.error(f"Failed to solve missing answers with AI: {e}")
-            return []
+            try:
+                response_text = await self.gemini._call_api_with_retry(
+                    system_prompt, json_payload, skip_validation=True
+                )
+                
+                # Parse JSON trực tiếp (KHÔNG dùng _parse_response vì nó 
+                # validate full quiz structure mà solve response không có)
+                cleaned = re.sub(r"```json\s*", "", response_text)
+                cleaned = re.sub(r"\s*```", "", cleaned).strip()
+                solved_data = json.loads(cleaned)
+                batch_solved = solved_data.get("questions", [])
+                
+                # Map kết quả về vị trí gốc bằng index
+                for solved_q in batch_solved:
+                    # Lấy index từ AI response (1-based) → convert về 0-based
+                    ai_index = solved_q.get("index")
+                    if ai_index is not None and 1 <= ai_index <= len(batch):
+                        original_idx = batch[ai_index - 1][0]  # index gốc trong questions[]
+                        all_solved[original_idx] = solved_q
+                    else:
+                        # Fallback: nếu AI không trả index, dùng thứ tự
+                        pass
+                
+                # Fallback: nếu không có index, map theo thứ tự xuất hiện
+                items_without_index = [s for s in batch_solved if s.get("index") is None]
+                if items_without_index and len(items_without_index) == len(batch):
+                    # AI không trả index → map theo thứ tự
+                    for i, (original_idx, _) in enumerate(batch):
+                        if i < len(batch_solved):
+                            all_solved[original_idx] = batch_solved[i]
+                
+                logger.info(f"Batch {batch_idx + 1}: solved {len(batch_solved)} questions")
+            except Exception as e:
+                logger.error(f"Batch {batch_idx + 1} failed: {e}")
+                # Tiếp tục các batch còn lại
+                continue
+        
+        return all_solved
 
     async def _save_quiz_and_questions(
         self,
@@ -386,7 +487,7 @@ Return ONLY a valid JSON object matching this structure:
         questions_cursor = self.db.questions.find(
             {"quiz_id": quiz_id}
         ).sort("order", 1)
-        questions = await questions_cursor.to_list(length=100)
+        questions = await questions_cursor.to_list(length=None)
 
         # Build response (ẩn correct_answer)
         quiz_response = {

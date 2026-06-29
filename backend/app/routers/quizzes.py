@@ -90,7 +90,7 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Quiz not found")
         
     questions_cursor = db.questions.find({"quiz_id": quiz_id}).sort("order", 1)
-    questions = await questions_cursor.to_list(length=100)
+    questions = await questions_cursor.to_list(length=None)
     
     return {
         "id": str(quiz["_id"]),
@@ -134,7 +134,7 @@ async def submit_quiz(
         
     # Lấy tất cả câu hỏi của quiz
     questions_cursor = db.questions.find({"quiz_id": quiz_id})
-    questions = await questions_cursor.to_list(length=100)
+    questions = await questions_cursor.to_list(length=None)
     
     if not questions:
         raise HTTPException(status_code=404, detail="No questions found for this quiz")
@@ -143,21 +143,25 @@ async def submit_quiz(
     question_map = {str(q["_id"]): q for q in questions}
     
     score = 0
+    total_with_answer = 0
     results = []
     
-    for answer in payload.answers:
-        q_id = answer.question_id
-        selected = answer.selected
+    # Map user answers
+    user_answers_map = {a.question_id: a.selected for a in payload.answers}
+    
+    for q_id, q_data in question_map.items():
+        selected = user_answers_map.get(q_id)
         
-        if q_id not in question_map:
-            continue
-            
-        q_data = question_map[q_id]
-        correct_answer = q_data["correct_answer"]
-        is_correct = (selected == correct_answer)
+        correct_answer = q_data.get("correct_answer", "")
         
-        if is_correct:
-            score += 1
+        # Chỉ chấm điểm nếu câu hỏi có đáp án
+        if correct_answer:
+            total_with_answer += 1
+            is_correct = (selected == correct_answer) if selected else False
+            if is_correct:
+                score += 1
+        else:
+            is_correct = False
             
         results.append({
             "question_id": q_id,
@@ -168,15 +172,17 @@ async def submit_quiz(
         })
         
     total = len(questions)
-    percentage = (score / total) * 100 if total > 0 else 0
+    # Tính % dựa trên số câu CÓ đáp án (tránh chia cho 0)
+    percentage = (score / total_with_answer) * 100 if total_with_answer > 0 else 0
     
     # Optional: Lưu kết quả làm bài vào quiz_attempts collection
     attempt_doc = {
         "quiz_id": ObjectId(quiz_id),
         "user_id": None, # Will be updated in Phase 5 with auth
-        "answers": [{"question_id": ObjectId(a.question_id), "selected": a.selected} for a in payload.answers],
+        "answers": [{"question_id": ObjectId(q_id), "selected": user_answers_map.get(q_id)} for q_id in question_map.keys()],
         "score": score,
         "total": total,
+        "total_with_answer": total_with_answer,
         "completed_at": datetime.now(timezone.utc)
     }
     await db.quiz_attempts.insert_one(attempt_doc)
@@ -184,6 +190,7 @@ async def submit_quiz(
     return {
         "score": score,
         "total": total,
+        "total_with_answer": total_with_answer,
         "percentage": round(percentage, 2),
         "results": results
     }

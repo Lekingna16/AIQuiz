@@ -230,7 +230,7 @@ class DeepSeekService:
         )),
         reraise=True,
     )
-    async def _call_api_with_retry(self, system_prompt: str, text: str) -> str:
+    async def _call_api_with_retry(self, system_prompt: str, text: str, skip_validation: bool = False) -> str:
         """
         Gọi DeepSeek API với retry logic.
 
@@ -242,6 +242,10 @@ class DeepSeekService:
         - API key invalid (401)
         - Rate limit (429) → tenacity exponential backoff
         - Timeout → raise ngay
+        
+        Args:
+            skip_validation: Nếu True, chỉ check JSON valid, không validate quiz structure.
+                           Dùng cho solve-answers flow (response chỉ có index + correct_answer).
         """
         try:
             # Chạy synchronous OpenAI call trong thread pool
@@ -265,8 +269,12 @@ class DeepSeekService:
             if not content:
                 raise QuizGenerationError("Empty response from DeepSeek API")
 
-            # Parse thử để trigger retry nếu JSON invalid
-            self._parse_response(content)
+            if skip_validation:
+                # Chỉ check JSON valid, không validate quiz structure
+                json.loads(re.sub(r"```json\s*", "", re.sub(r"\s*```", "", content)).strip())
+            else:
+                # Parse thử để trigger retry nếu JSON invalid
+                self._parse_response(content)
 
             return content
 

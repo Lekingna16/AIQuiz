@@ -132,7 +132,8 @@ function QuizPage() {
           score={resultsData.score} 
           total={resultsData.total} 
           percentage={resultsData.percentage} 
-          quizId={quizId} 
+          quizId={quizId}
+          questions={quiz?.questions || []}
         />
       </div>
     );
@@ -185,7 +186,7 @@ function QuizPage() {
           <button 
             className="btn btn-primary sidebar-submit"
             onClick={handleSubmit} 
-            disabled={isSubmitting || answeredCount === 0}
+            disabled={isSubmitting}
           >
             {isSubmitting ? <Loader2 size={18} className="spinner" /> : <Check size={18} />}
             Nộp bài ({answeredCount}/{totalQuestions})
@@ -247,7 +248,7 @@ function QuizPage() {
                 <button 
                   className="btn btn-primary nav-btn" 
                   onClick={handleSubmit} 
-                  disabled={isSubmitting || answeredCount === 0}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? <Loader2 size={18} className="spinner" /> : <><Check size={18} /> Nộp bài</>}
                 </button>

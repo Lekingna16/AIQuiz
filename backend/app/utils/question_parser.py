@@ -10,9 +10,14 @@ Hỗ trợ các format phổ biến:
   - Options trên dòng riêng: "A. ...", "A) ...", "a. ..."
   - Options trên cùng 1 dòng: "A. x B. y C. z D. w"
   - Options hỗn hợp: A. B. trên 1 dòng + C. D. trên dòng tiếp
-  - Đáp án: "Đáp án: A" / "ĐA: B" / "Answer: C"
-  - Bảng đáp án cuối file: "1 | B | 2 | D | ..."
-  - Không có đáp án: vẫn trích xuất câu hỏi + options
+  - Đáp án inline: "Đáp án: A" / "ĐA: B" / "Answer: C"
+  - Đáp án tô sẵn: **A**, *A*, ✓A, √A, [x]A, (x)A
+  - Bảng đáp án cuối file:
+    + Dạng pipe:  "1 | B | 26 | D | 51 | A"
+    + Dạng dot:   "1.A  2.B  3.C  4.D"
+    + Dạng dash:  "1-A, 2-B, 3-C, 4-D"
+    + Dạng liệt kê: "1. A    2. B    3. C"
+    + Dạng header: "ĐÁP ÁN" / "BẢNG ĐÁP ÁN" section
 
 Performance: parse file 0.3MB (~100 câu) < 50ms.
 """
@@ -63,8 +68,43 @@ QUESTION_NUM_PATTERN = re.compile(
 )
 
 # Pattern bảng đáp án cuối file: "1 | B | 26 | D | 51 | A | 76 | B"
-ANSWER_TABLE_PATTERN = re.compile(
+ANSWER_TABLE_PIPE_PATTERN = re.compile(
     r"(\d{1,4})\s*\|\s*([A-Da-d])",
+    re.IGNORECASE,
+)
+
+# Pattern bảng đáp án dạng dot/dash: "1.A" "1-A" "1: A" "1)A"
+ANSWER_TABLE_COMPACT_PATTERN = re.compile(
+    r"(?:^|[\s,;])(\d{1,4})\s*[.\-:)]\s*([A-Da-d])(?=[\s,;.$]|$)",
+    re.IGNORECASE,
+)
+
+# Header patterns để nhận diện section bảng đáp án
+ANSWER_SECTION_HEADERS = [
+    re.compile(r"(?:BẢNG\s*)?ĐÁP\s*ÁN", re.IGNORECASE),
+    re.compile(r"ANSWER\s*KEY", re.IGNORECASE),
+    re.compile(r"Câu\s*\|\s*Đáp\s*án", re.IGNORECASE),
+    re.compile(r"Câu\s*\|\s*ĐA", re.IGNORECASE),
+    re.compile(r"STT\s*\|\s*Đáp", re.IGNORECASE),
+    re.compile(r"KEY\s*:", re.IGNORECASE),
+]
+
+# Pattern nhận diện option bị tô/đánh dấu
+# Ví dụ: **A.** text, *A.* text, __A.__ text, _A._ text
+MARKED_OPTION_BOLD = re.compile(
+    r"^\s*\*{1,2}([A-Da-d])\s*[.):\-]\s*(.+?)\*{1,2}\s*$"
+)
+MARKED_OPTION_UNDERLINE = re.compile(
+    r"^\s*_{1,2}([A-Da-d])\s*[.):\-]\s*(.+?)_{1,2}\s*$"
+)
+# Dấu tích: ✓, √, ✔, ☑, [x], (x)
+MARKED_OPTION_CHECK = re.compile(
+    r"^\s*(?:[✓✔√☑]|\[x\]|\(x\))\s*([A-Da-d])\s*[.):\-]\s*(.+?)$",
+    re.IGNORECASE,
+)
+# Dấu tích sau option key: "A. ✓ text" hoặc "A. √ text"
+MARKED_OPTION_CHECK_AFTER = re.compile(
+    r"^\s*([A-Da-d])\s*[.):\-]\s*(?:[✓✔√☑]|\[x\]|\(x\))\s*(.+?)$",
     re.IGNORECASE,
 )
 
@@ -72,6 +112,12 @@ ANSWER_TABLE_PATTERN = re.compile(
 def parse_questions_from_text(text: str) -> list[dict]:
     """
     Parse câu hỏi trắc nghiệm từ văn bản thô.
+    
+    Ưu tiên đáp án:
+    1. Đáp án inline trong câu hỏi ("Đáp án: A")
+    2. Đáp án tô sẵn/đánh dấu trong options (**A**, ✓A)
+    3. Bảng đáp án cuối file
+    4. → Nếu vẫn thiếu → gọi AI (ở quiz_service.py)
     """
     if not text or not text.strip():
         return []
@@ -85,6 +131,15 @@ def parse_questions_from_text(text: str) -> list[dict]:
     questions = _parse_line_by_line(text, answer_map)
 
     logger.info(f"Parsed {len(questions)} raw questions from text")
+    
+    # Log statistics
+    with_answer = sum(1 for q in questions if q.get("correct_answer"))
+    without_answer = len(questions) - with_answer
+    logger.info(
+        f"Answer stats: {with_answer} có đáp án, "
+        f"{without_answer} cần AI giải"
+    )
+    
     return questions
 
 
@@ -122,20 +177,20 @@ def _parse_answer_table(text: str) -> dict[int, str]:
     """
     Tìm và parse bảng đáp án ở cuối file.
 
-    Format phổ biến:
-    Câu | Đáp án | Câu | Đáp án
-    1   | B      | 26  | D
-    2   | D      | 27  | A
-    ...
+    Hỗ trợ nhiều format:
+    1. Pipe: "1 | B | 26 | D"
+    2. Compact: "1.A  2.B  3.C  4.D" hoặc "1-A, 2-B, 3-C"
+    3. Listing: "1. A    2. B    3. C"
+    4. Section header: "ĐÁP ÁN" / "BẢNG ĐÁP ÁN" / "ANSWER KEY"
 
-    Returns: dict mapping question_number -> answer_key
+    Returns: dict mapping question_number -> answer_key (uppercase)
     """
     answer_map = {}
 
-    # Tìm phần bảng đáp án (thường bắt đầu bằng header chứa "Đáp án")
+    # Tìm vị trí bắt đầu section đáp án
     table_start = -1
-    for pattern_str in [r"Câu\s*\|\s*Đáp\s*án", r"Câu\s*\|\s*ĐA", r"STT\s*\|\s*Đáp"]:
-        match = re.search(pattern_str, text, re.IGNORECASE)
+    for header_pattern in ANSWER_SECTION_HEADERS:
+        match = header_pattern.search(text)
         if match:
             table_start = match.start()
             break
@@ -145,14 +200,66 @@ def _parse_answer_table(text: str) -> dict[int, str]:
 
     table_text = text[table_start:]
 
-    # Parse từng cặp (số câu, đáp án)
-    for match in ANSWER_TABLE_PATTERN.finditer(table_text):
-        q_num = int(match.group(1))
-        answer = match.group(2).upper()
-        if 1 <= q_num <= 9999:
-            answer_map[q_num] = answer
+    # Thử parse dạng pipe trước (chính xác nhất)
+    pipe_matches = list(ANSWER_TABLE_PIPE_PATTERN.finditer(table_text))
+    if pipe_matches:
+        for m in pipe_matches:
+            q_num = int(m.group(1))
+            answer = m.group(2).upper()
+            if 1 <= q_num <= 9999:
+                answer_map[q_num] = answer
+        if answer_map:
+            return answer_map
+
+    # Thử parse dạng compact: "1.A  2.B  3.C" hoặc "1-A, 2-B"
+    compact_matches = list(ANSWER_TABLE_COMPACT_PATTERN.finditer(table_text))
+    if len(compact_matches) >= 3:  # Cần ít nhất 3 cặp để chắc chắn đây là bảng
+        for m in compact_matches:
+            q_num = int(m.group(1))
+            answer = m.group(2).upper()
+            if 1 <= q_num <= 9999:
+                answer_map[q_num] = answer
 
     return answer_map
+
+
+def _detect_marked_answer(options: list[dict], raw_lines: list[str]) -> str:
+    """
+    Phát hiện đáp án đã được tô/đánh dấu sẵn trong options.
+    
+    Nhận diện các dạng:
+    - In đậm: **A. text** hoặc __A. text__
+    - Dấu tích: ✓A. text, √A. text, ✔A. text, [x]A. text
+    - Dấu tích sau key: A. ✓ text
+    
+    Returns: answer key (A/B/C/D) hoặc "" nếu không tìm thấy
+    """
+    for line in raw_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Check bold marking: **A. text** hoặc *A. text*
+        m = MARKED_OPTION_BOLD.match(stripped)
+        if m:
+            return m.group(1).upper()
+        
+        # Check underline marking: __A. text__ hoặc _A. text_
+        m = MARKED_OPTION_UNDERLINE.match(stripped)
+        if m:
+            return m.group(1).upper()
+        
+        # Check tick before key: ✓A. text
+        m = MARKED_OPTION_CHECK.match(stripped)
+        if m:
+            return m.group(1).upper()
+        
+        # Check tick after key: A. ✓ text
+        m = MARKED_OPTION_CHECK_AFTER.match(stripped)
+        if m:
+            return m.group(1).upper()
+    
+    return ""
 
 
 def _extract_options_from_line(line: str) -> list[dict]:
@@ -200,6 +307,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     2. Tất cả options trên 1 dòng
     3. Hỗn hợp (2 options/dòng)
     4. Bảng đáp án cuối file
+    5. Đáp án tô sẵn trong options
     """
     lines = text.split("\n")
     questions = []
@@ -207,17 +315,21 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     current_q_text = ""
     current_options = []
     current_answer = ""
+    current_option_raw_lines = []  # Lưu raw lines của options để detect marking
 
     # Xác định phần bảng đáp án để bỏ qua
     table_start_line = len(lines)
     for i, line in enumerate(lines):
-        if re.search(r"Câu\s*\|\s*Đáp\s*án|Câu\s*\|\s*ĐA|STT\s*\|\s*Đáp", line, re.IGNORECASE):
-            table_start_line = i
+        for header_pattern in ANSWER_SECTION_HEADERS:
+            if header_pattern.search(line):
+                table_start_line = i
+                break
+        if i == table_start_line:
             break
 
     def _save_current():
         """Lưu câu hỏi hiện tại nếu hợp lệ."""
-        nonlocal current_q_text, current_options, current_answer, current_q_num
+        nonlocal current_q_text, current_options, current_answer, current_q_num, current_option_raw_lines
         if current_q_text and len(current_options) >= 2:
             cleaned = _clean_question_text(current_q_text)
             if cleaned and len(cleaned) >= 3:
@@ -230,8 +342,18 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                         final_opts.append(opt)
 
                 if len(final_opts) >= 2:
-                    # Tra cứu đáp án từ bảng nếu chưa có
                     answer = current_answer
+                    
+                    # Ưu tiên 1: đáp án inline đã tìm thấy
+                    # (current_answer đã được set)
+                    
+                    # Ưu tiên 2: đáp án tô sẵn trong options
+                    if not answer:
+                        answer = _detect_marked_answer(
+                            final_opts, current_option_raw_lines
+                        )
+                    
+                    # Ưu tiên 3: tra cứu bảng đáp án
                     if not answer and current_q_num in answer_map:
                         answer = answer_map[current_q_num]
 
@@ -246,6 +368,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         current_options = []
         current_answer = ""
         current_q_num = 0
+        current_option_raw_lines = []
 
     for line_idx, line in enumerate(lines):
         # Bỏ qua bảng đáp án cuối file
@@ -256,6 +379,8 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             break
 
         stripped = line.strip()
+        # Lưu bản gốc trước khi strip markdown (để detect bold/underline marking)
+        original_stripped = stripped
         # Loại bỏ markdown formatting (**, *, __, _)
         stripped = re.sub(r"^\*{1,2}|\*{1,2}$", "", stripped).strip()
         stripped = re.sub(r"^_{1,2}|_{1,2}$", "", stripped).strip()
@@ -314,9 +439,11 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                 else:
                     current_q_text = q_text
                 current_options = inline_opts
+                current_option_raw_lines = [q_text]
             else:
                 current_q_text = q_text
                 current_options = []
+                current_option_raw_lines = []
 
             current_answer = ""
             continue
@@ -326,6 +453,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             inline_opts = _extract_options_from_line(stripped)
             if inline_opts:
                 current_options.extend(inline_opts)
+                current_option_raw_lines.append(original_stripped)
                 continue
 
         # ---- 4. Check: dòng là 1 OPTION riêng lẻ? ----
@@ -334,6 +462,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             key = opt_match.group(1).upper()
             opt_text = opt_match.group(2).strip()
             current_options.append({"key": key, "text": opt_text})
+            current_option_raw_lines.append(original_stripped)
             continue
 
         # ---- 5. Dòng không match → phần tiếp theo của câu hỏi hoặc option ----
