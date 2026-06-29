@@ -30,7 +30,6 @@ const Header = () => {
     <header className="app-header">
       <div className="header-container">
         <Link to="/" className="logo">
-          <span className="logo-icon">🧠</span>
           <h1>AIQuiz</h1>
         </Link>
         
