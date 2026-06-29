@@ -39,13 +39,12 @@ async def google_login(request: GoogleLoginRequest):
             user=user
         )
     except HTTPException as e:
-        with open("debug.log", "a", encoding="utf-8") as f:
-            f.write(f"HTTPException: {e.detail}\n")
+        print(f"[AUTH ERROR] HTTPException: {e.detail}")
         raise
     except Exception as e:
-        with open("debug.log", "a", encoding="utf-8") as f:
-            f.write(f"Exception: {str(e)}\n")
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"[AUTH ERROR] Exception: {str(e)}")
+        # Trả về lỗi chi tiết để Frontend nhận diện được ngay (ví dụ: lỗi MongoDB timeout)
+        raise HTTPException(status_code=400, detail=f"Server Error: {str(e)}")
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: UserResponse = Depends(get_current_user)):
