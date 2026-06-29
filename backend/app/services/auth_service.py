@@ -34,10 +34,11 @@ class AuthService:
                     raise ValueError("Invalid mock token")
             
             # Real validation
+            clean_client_id = settings.GOOGLE_CLIENT_ID.replace('"', '').replace("'", "").strip()
             idinfo = id_token.verify_oauth2_token(
                 token, 
                 requests.Request(), 
-                settings.GOOGLE_CLIENT_ID,
+                clean_client_id,
                 clock_skew_in_seconds=60  # Cho phép lệch giờ lên tới 60 giây
             )
 
