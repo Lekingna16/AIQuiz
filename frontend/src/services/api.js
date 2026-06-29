@@ -17,7 +17,7 @@ import axios from "axios";
 
 // Base URL của backend API
 // Vite dùng import.meta.env thay vì process.env (Create React App)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://aiquiz-hla0.onrender.com";
 
 // Tạo axios instance với config chung
 const api = axios.create({
