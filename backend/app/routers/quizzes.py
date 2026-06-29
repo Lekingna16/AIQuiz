@@ -143,7 +143,6 @@ async def submit_quiz(
     question_map = {str(q["_id"]): q for q in questions}
     
     score = 0
-    total_with_answer = 0
     results = []
     
     # Map user answers
@@ -154,14 +153,9 @@ async def submit_quiz(
         
         correct_answer = q_data.get("correct_answer", "")
         
-        # Chỉ chấm điểm nếu câu hỏi có đáp án
-        if correct_answer:
-            total_with_answer += 1
-            is_correct = (selected == correct_answer) if selected else False
-            if is_correct:
-                score += 1
-        else:
-            is_correct = False
+        is_correct = (selected == correct_answer) if selected else False
+        if is_correct:
+            score += 1
             
         results.append({
             "question_id": q_id,
@@ -172,8 +166,7 @@ async def submit_quiz(
         })
         
     total = len(questions)
-    # Tính % dựa trên số câu CÓ đáp án (tránh chia cho 0)
-    percentage = (score / total_with_answer) * 100 if total_with_answer > 0 else 0
+    percentage = (score / total) * 100 if total > 0 else 0
     
     # Optional: Lưu kết quả làm bài vào quiz_attempts collection
     attempt_doc = {
@@ -182,7 +175,6 @@ async def submit_quiz(
         "answers": [{"question_id": ObjectId(q_id), "selected": user_answers_map.get(q_id)} for q_id in question_map.keys()],
         "score": score,
         "total": total,
-        "total_with_answer": total_with_answer,
         "completed_at": datetime.now(timezone.utc)
     }
     await db.quiz_attempts.insert_one(attempt_doc)
@@ -190,7 +182,6 @@ async def submit_quiz(
     return {
         "score": score,
         "total": total,
-        "total_with_answer": total_with_answer,
         "percentage": round(percentage, 2),
         "results": results
     }

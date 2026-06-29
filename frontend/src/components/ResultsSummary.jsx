@@ -13,9 +13,8 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
 
   // Count stats
   const correctCount = results.filter(r => r.is_correct).length;
-  const incorrectCount = results.filter(r => !r.is_correct && r.selected && r.correct_answer).length;
-  const skippedCount = results.filter(r => !r.selected && r.correct_answer).length;
-  const unknownCount = results.filter(r => !r.is_correct && !r.correct_answer).length;
+  const incorrectCount = results.filter(r => !r.is_correct && r.selected).length;
+  const skippedCount = results.filter(r => !r.selected).length;
   
   // Show first 20 by default, toggle to show all
   const displayResults = showAll ? results : results.slice(0, 20);
@@ -77,12 +76,6 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
               <span>{skippedCount} bỏ qua</span>
             </div>
           )}
-          {unknownCount > 0 && (
-            <div className="stat-item unknown">
-              <HelpCircle size={16} />
-              <span>{unknownCount} chưa có đáp án</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -90,8 +83,7 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
         <h3>Chi tiết từng câu</h3>
         {displayResults.map((res, index) => {
           const qInfo = questionMap[res.question_id];
-          const hasAnswer = !!res.correct_answer;
-          const statusClass = !hasAnswer ? 'unknown' : res.is_correct ? 'correct' : 'incorrect';
+          const statusClass = res.is_correct ? 'correct' : 'incorrect';
           
           // Find option text for selected and correct
           const getOptionText = (key) => {
@@ -104,9 +96,7 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
             <div key={res.question_id} className={`result-item ${statusClass}`}>
               <div className="result-header">
                 <span className="q-num">Câu {index + 1}</span>
-                {!hasAnswer ? (
-                  <HelpCircle className="icon-unknown" size={20} />
-                ) : res.is_correct ? (
+                {res.is_correct ? (
                   <CheckCircle className="icon-correct" size={20} />
                 ) : (
                   <XCircle className="icon-incorrect" size={20} />
@@ -125,17 +115,12 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
                     <span className="option-text"> - {getOptionText(res.selected)}</span>
                   )}
                 </p>
-                {hasAnswer && !res.is_correct && (
+                {!res.is_correct && (
                   <p className="correct-answer-line">
                     Đáp án đúng: <strong>{res.correct_answer}</strong>
                     {getOptionText(res.correct_answer) && (
                       <span className="option-text"> - {getOptionText(res.correct_answer)}</span>
                     )}
-                  </p>
-                )}
-                {!hasAnswer && (
-                  <p className="no-answer-note">
-                    ⚠ Câu này chưa có đáp án trong hệ thống
                   </p>
                 )}
               </div>
