@@ -80,7 +80,8 @@ const Header = () => {
                   login(data.user, data.access_token);
                   toast.success(`Xin chào, ${data.user.full_name}!`);
                 } catch (error) {
-                  toast.error('Lỗi xác thực từ Server');
+                  const errorMsg = error.response?.data?.detail || 'Lỗi xác thực từ Server';
+                  toast.error(errorMsg);
                 }
               }}
               onError={() => {
