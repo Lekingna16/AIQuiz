@@ -22,6 +22,8 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.document import DocumentResponse
 from app.models.quiz import QuizResponse, Difficulty
+from app.models.user import UserResponse
+from app.dependencies import get_current_user
 from app.services.ai_service import (
     DeepSeekService,
     DeepSeekServiceError,
@@ -152,6 +154,12 @@ async def upload_document(
         default="generate",
         description="Chế độ xử lý: generate (sinh câu mới) hoặc extract (trích xuất và lọc trùng)",
     ),
+    subject: str | None = Query(default=None, description="Môn học"),
+    chapter: str | None = Query(default=None, description="Chương"),
+    exam_type: str | None = Query(default=None, description="Thi giữa kì/cuối kì"),
+    school: str | None = Query(default=None, description="Trường"),
+    is_public: bool = Query(default=False, description="Công khai cho người khác làm"),
+    current_user: UserResponse = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -208,6 +216,12 @@ async def upload_document(
             difficulty=difficulty.value,
             language=language,
             mode=mode,
+            user_id=str(current_user.id),
+            subject=subject,
+            chapter=chapter,
+            exam_type=exam_type,
+            school=school,
+            is_public=is_public,
         )
 
         return result

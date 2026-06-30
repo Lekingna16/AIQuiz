@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import Database
-from app.routers import documents, quizzes, auth
+from app.routers import documents, quizzes, auth, comments
 
 
 # ============================================
@@ -136,6 +136,7 @@ Mỗi router đã có prefix riêng:
 app.include_router(documents.router)
 app.include_router(quizzes.router)
 app.include_router(auth.router)
+app.include_router(comments.router)
 
 
 # ============================================

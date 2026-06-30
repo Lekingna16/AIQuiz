@@ -97,6 +97,12 @@ export const uploadDocument = async (file, options = {}) => {
   if (options.language) params.append("language", options.language);
   if (options.mode) params.append("mode", options.mode);
 
+  if (options.subject) params.append("subject", options.subject);
+  if (options.chapter) params.append("chapter", options.chapter);
+  if (options.exam_type) params.append("exam_type", options.exam_type);
+  if (options.school) params.append("school", options.school);
+  if (options.is_public !== undefined) params.append("is_public", options.is_public);
+
   const response = await api.post(
     `/api/documents/upload?${params.toString()}`,
     formData,
@@ -110,8 +116,18 @@ export const uploadDocument = async (file, options = {}) => {
 /**
  * Lấy danh sách quiz
  */
-export const getQuizzes = async (page = 1, limit = 10) => {
+export const getQuizzes = async (page = 1, limit = 10, filters = {}) => {
   const response = await api.get("/api/quizzes", {
+    params: { page, limit, ...filters },
+  });
+  return response.data;
+};
+
+/**
+ * Lấy danh sách quiz của người dùng
+ */
+export const getMyQuizzes = async (page = 1, limit = 10) => {
+  const response = await api.get("/api/quizzes/me", {
     params: { page, limit },
   });
   return response.data;
@@ -149,6 +165,22 @@ export const loginWithGoogle = async (credential) => {
  */
 export const getMe = async () => {
   const response = await api.get('/api/auth/me');
+  return response.data;
+};
+
+/**
+ * Lấy danh sách comments của một câu hỏi
+ */
+export const getComments = async (questionId) => {
+  const response = await api.get(`/api/comments/question/${questionId}`);
+  return response.data;
+};
+
+/**
+ * Thêm comment mới
+ */
+export const addComment = async (questionId, data) => {
+  const response = await api.post(`/api/comments/question/${questionId}`, data);
   return response.data;
 };
 

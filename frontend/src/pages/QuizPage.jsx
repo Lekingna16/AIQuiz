@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { getQuiz, submitQuiz } from "../services/api";
 import QuestionCard from "../components/QuestionCard";
 import ResultsSummary from "../components/ResultsSummary";
+import Comments from "../components/Comments";
 
 function QuizPage() {
   const { quizId } = useParams();
@@ -226,6 +227,8 @@ function QuizPage() {
               currentAnswer={answers[currentQuestion.id]} 
               onSelectAnswer={handleSelectAnswer} 
             />
+
+            <Comments questionId={currentQuestion.id} />
 
             {/* Navigation: Prev | 3-dot indicator | Next */}
             <div className="quiz-navigation">

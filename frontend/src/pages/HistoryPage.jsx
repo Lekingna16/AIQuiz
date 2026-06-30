@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Clock, Loader2, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { getQuizzes } from "../services/api";
+import { getMyQuizzes } from "../services/api";
 import axios from "axios";
 
 function HistoryPage() {
@@ -21,7 +21,7 @@ function HistoryPage() {
   const fetchHistory = async (pageToFetch) => {
     setLoading(true);
     try {
-      const data = await getQuizzes(pageToFetch, 10);
+      const data = await getMyQuizzes(pageToFetch, 10);
       setQuizzes(data.quizzes);
       setTotalPages(data.pages);
       setPage(data.page);

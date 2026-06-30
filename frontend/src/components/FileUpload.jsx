@@ -12,6 +12,14 @@ const FileUpload = () => {
   const [difficulty, setDifficulty] = useState("mixed");
   const [language, setLanguage] = useState("vi");
   const [mode, setMode] = useState("generate");
+  
+  // New metadata fields
+  const [subject, setSubject] = useState("");
+  const [chapter, setChapter] = useState("");
+  const [examType, setExamType] = useState("");
+  const [school, setSchool] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  
   const navigate = useNavigate();
 
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
@@ -51,6 +59,11 @@ const FileUpload = () => {
         difficulty: difficulty,
         language: language,
         mode: mode,
+        subject: subject,
+        chapter: chapter,
+        exam_type: examType,
+        school: school,
+        is_public: isPublic,
       });
       
       toast.success("Tạo quiz thành công!");
@@ -140,6 +153,68 @@ const FileUpload = () => {
             <option value="en">English</option>
           </select>
         </div>
+      </div>
+
+      <div className="quiz-config metadata-config" style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <div className="form-group">
+          <label>Môn học</label>
+          <input 
+            type="text" 
+            placeholder="VD: Toán học" 
+            value={subject} 
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={isUploading}
+            className="form-input"
+          />
+        </div>
+        <div className="form-group">
+          <label>Chương / Bài</label>
+          <input 
+            type="text" 
+            placeholder="VD: Chương 1" 
+            value={chapter} 
+            onChange={(e) => setChapter(e.target.value)}
+            disabled={isUploading}
+            className="form-input"
+          />
+        </div>
+        <div className="form-group">
+          <label>Kỳ thi</label>
+          <select 
+            value={examType} 
+            onChange={(e) => setExamType(e.target.value)}
+            disabled={isUploading}
+            className="form-input"
+          >
+            <option value="">Không xác định</option>
+            <option value="Giữa kì">Giữa kì</option>
+            <option value="Cuối kì">Cuối kì</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Trường học</label>
+          <input 
+            type="text" 
+            placeholder="VD: ĐH Bách Khoa" 
+            value={school} 
+            onChange={(e) => setSchool(e.target.value)}
+            disabled={isUploading}
+            className="form-input"
+          />
+        </div>
+      </div>
+      
+      <div className="form-group checkbox-group" style={{ margin: "1rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <input 
+          type="checkbox" 
+          id="isPublic"
+          checked={isPublic} 
+          onChange={(e) => setIsPublic(e.target.checked)}
+          disabled={isUploading}
+        />
+        <label htmlFor="isPublic" style={{ margin: 0, fontWeight: "normal" }}>
+          Chia sẻ công khai (Cần admin duyệt)
+        </label>
       </div>
 
       {/* Khu vực Dropzone */}

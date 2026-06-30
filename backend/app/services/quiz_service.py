@@ -81,6 +81,11 @@ class QuizService:
         language: str = "vi",
         mode: str = "generate",
         user_id: str | None = None,
+        subject: str | None = None,
+        chapter: str | None = None,
+        exam_type: str | None = None,
+        school: str | None = None,
+        is_public: bool = False,
     ) -> dict:
         """
         Pipeline hoàn chỉnh: File → Text → AI → Quiz.
@@ -259,6 +264,11 @@ class QuizService:
                 difficulty=difficulty,
                 language=language,
                 user_id=user_id,
+                subject=subject,
+                chapter=chapter,
+                exam_type=exam_type,
+                school=school,
+                is_public=is_public,
             )
             logger.info(
                 f"Quiz saved: {quiz_id} with {len(question_ids)} questions"
@@ -417,6 +427,11 @@ Return ONLY a valid JSON object matching this structure:
         difficulty: str,
         language: str,
         user_id: str | None,
+        subject: str | None,
+        chapter: str | None,
+        exam_type: str | None,
+        school: str | None,
+        is_public: bool,
     ) -> tuple[str, list[str]]:
         """
         Lưu quiz và questions vào MongoDB.
@@ -432,6 +447,12 @@ Return ONLY a valid JSON object matching this structure:
             "total_questions": len(quiz_data["questions"]),
             "difficulty": difficulty,
             "language": language,
+            "subject": subject,
+            "chapter": chapter,
+            "exam_type": exam_type,
+            "school": school,
+            "is_public": is_public,
+            "is_approved": False, # Mặc định cần admin duyệt nếu public
             "created_at": datetime.now(timezone.utc),
         }
         quiz_result = await self.db.quizzes.insert_one(quiz_doc)

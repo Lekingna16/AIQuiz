@@ -24,6 +24,8 @@ from app.models.quiz import (
     QuestionResponse,
     AnswerResult,
 )
+from app.models.user import UserResponse
+from app.dependencies import get_current_user
 
 
 router = APIRouter(
@@ -41,6 +43,10 @@ router = APIRouter(
 async def list_quizzes(
     page: int = Query(default=1, ge=1, description="Trang hiện tại"),
     limit: int = Query(default=10, ge=1, le=50, description="Số quiz/trang"),
+    subject: str | None = Query(default=None, description="Lọc theo môn học"),
+    chapter: str | None = Query(default=None, description="Lọc theo chương"),
+    exam_type: str | None = Query(default=None, description="Lọc theo loại kỳ thi"),
+    school: str | None = Query(default=None, description="Lọc theo trường"),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -48,9 +54,21 @@ async def list_quizzes(
     """
     skip = (page - 1) * limit
     
-    total = await db.quizzes.count_documents({})
+    # Base query: public and approved
+    query = {"is_public": True, "is_approved": True}
     
-    cursor = db.quizzes.find({}).sort("created_at", -1).skip(skip).limit(limit)
+    if subject:
+        query["subject"] = {"$regex": subject, "$options": "i"}
+    if chapter:
+        query["chapter"] = {"$regex": chapter, "$options": "i"}
+    if exam_type:
+        query["exam_type"] = {"$regex": exam_type, "$options": "i"}
+    if school:
+        query["school"] = {"$regex": school, "$options": "i"}
+
+    total = await db.quizzes.count_documents(query)
+    
+    cursor = db.quizzes.find(query).sort("created_at", -1).skip(skip).limit(limit)
     quizzes_db = await cursor.to_list(length=limit)
     
     quizzes = []
@@ -61,6 +79,55 @@ async def list_quizzes(
             "description": q.get("description", ""),
             "total_questions": q["total_questions"],
             "difficulty": q["difficulty"],
+            "subject": q.get("subject"),
+            "chapter": q.get("chapter"),
+            "exam_type": q.get("exam_type"),
+            "school": q.get("school"),
+            "created_at": q["created_at"].isoformat(),
+        })
+        
+    return {
+        "quizzes": quizzes,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / limit) if limit else 0,
+    }
+
+
+@router.get(
+    "/me",
+    response_model=dict,
+    summary="Get current user's quizzes",
+    description="Lấy danh sách quiz do user hiện tại tạo.",
+)
+async def get_my_quizzes(
+    page: int = Query(default=1, ge=1, description="Trang hiện tại"),
+    limit: int = Query(default=10, ge=1, le=50, description="Số quiz/trang"),
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    skip = (page - 1) * limit
+    query = {"user_id": str(current_user.id)}
+
+    total = await db.quizzes.count_documents(query)
+    
+    cursor = db.quizzes.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    quizzes_db = await cursor.to_list(length=limit)
+    
+    quizzes = []
+    for q in quizzes_db:
+        quizzes.append({
+            "id": str(q["_id"]),
+            "title": q["title"],
+            "description": q.get("description", ""),
+            "total_questions": q["total_questions"],
+            "difficulty": q["difficulty"],
+            "subject": q.get("subject"),
+            "chapter": q.get("chapter"),
+            "exam_type": q.get("exam_type"),
+            "school": q.get("school"),
+            "is_public": q.get("is_public", False),
+            "is_approved": q.get("is_approved", False),
             "created_at": q["created_at"].isoformat(),
         })
         
@@ -98,6 +165,10 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
         "description": quiz.get("description", ""),
         "total_questions": quiz["total_questions"],
         "difficulty": quiz["difficulty"],
+        "subject": quiz.get("subject"),
+        "chapter": quiz.get("chapter"),
+        "exam_type": quiz.get("exam_type"),
+        "school": quiz.get("school"),
         "created_at": quiz["created_at"].isoformat(),
         "questions": [
             {

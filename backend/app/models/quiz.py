@@ -114,6 +114,12 @@ class QuizInDB(BaseModel):
     total_questions: int = Field(..., ge=1)
     difficulty: Difficulty = Field(default=Difficulty.MIXED)
     language: str = Field(default="vi")
+    subject: str | None = Field(default=None, description="Môn học")
+    chapter: str | None = Field(default=None, description="Chương")
+    exam_type: str | None = Field(default=None, description="Thi giữa kì/cuối kì")
+    school: str | None = Field(default=None, description="Trường")
+    is_public: bool = Field(default=False, description="Công khai cho người khác làm")
+    is_approved: bool = Field(default=False, description="Admin duyệt")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
     )
@@ -128,6 +134,12 @@ class QuizResponse(BaseModel):
     description: str
     total_questions: int
     difficulty: Difficulty
+    subject: str | None = None
+    chapter: str | None = None
+    exam_type: str | None = None
+    school: str | None = None
+    is_public: bool = False
+    is_approved: bool = False
     created_at: datetime
     questions: list[QuestionResponse] = Field(default_factory=list)
 
@@ -139,6 +151,13 @@ class QuizSummaryResponse(BaseModel):
     description: str
     total_questions: int
     difficulty: Difficulty
+    subject: str | None = None
+    chapter: str | None = None
+    exam_type: str | None = None
+    school: str | None = None
+    is_public: bool = False
+    is_approved: bool = False
+    user_id: str | None = None
     created_at: datetime
 
 
