@@ -34,6 +34,7 @@ const Header = () => {
         </Link>
         
         <nav className="header-nav">
+          <Link to="/upload" className="nav-link">Tạo câu hỏi</Link>
           <Link to="/history" className="nav-link">Lịch sử</Link>
 
           <button 

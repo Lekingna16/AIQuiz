@@ -19,6 +19,7 @@ import { Toaster } from "sonner";
 import HomePage from "./pages/HomePage";
 import QuizPage from "./pages/QuizPage";
 import HistoryPage from "./pages/HistoryPage";
+import UploadPage from "./pages/UploadPage";
 
 import Header from "./components/Header";
 
@@ -48,6 +49,7 @@ function App() {
       <main className="app-container">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/upload" element={<UploadPage />} />
           <Route path="/quiz/:quizId" element={<QuizPage />} />
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
