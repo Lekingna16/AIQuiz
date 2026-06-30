@@ -46,13 +46,15 @@ class Database:
         # Cần import certifi để xử lý lỗi SSL/TLS trên môi trường Linux (Render/Vercel)
         import certifi
 
+        is_atlas = "mongodb+srv://" in settings.MONGODB_URL
+        
         # Tạo client - chưa thực sự kết nối, chỉ cấu hình
         cls.client = AsyncIOMotorClient(
             settings.MONGODB_URL,
             # Timeout kết nối: 5 giây (tránh treo app nếu MongoDB chết)
             serverSelectionTimeoutMS=5000,
-            tlsCAFile=certifi.where(),
-            tls=True
+            tlsCAFile=certifi.where() if is_atlas else None,
+            tls=is_atlas
         )
 
         # Lấy reference tới database cụ thể

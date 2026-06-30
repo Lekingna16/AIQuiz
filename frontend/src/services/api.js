@@ -64,6 +64,11 @@ api.interceptors.response.use(
   (error) => {
     // Phân loại lỗi để hiển thị message phù hợp
     if (error.response) {
+      // Nếu lỗi 401 hoặc 403 (Hết hạn token, user bị xóa, hoặc thiếu token), force logout
+      if (error.response.status === 401 || error.response.status === 403) {
+        localStorage.removeItem('auth-storage');
+        window.location.href = '/';
+      }
       // Server trả về error (4xx, 5xx)
       const message = error.response.data?.detail || "Đã có lỗi xảy ra";
       console.error(`API Error [${error.response.status}]:`, message);
@@ -97,10 +102,6 @@ export const uploadDocument = async (file, options = {}) => {
   if (options.language) params.append("language", options.language);
   if (options.mode) params.append("mode", options.mode);
 
-  if (options.subject) params.append("subject", options.subject);
-  if (options.chapter) params.append("chapter", options.chapter);
-  if (options.exam_type) params.append("exam_type", options.exam_type);
-  if (options.school) params.append("school", options.school);
   if (options.is_public !== undefined) params.append("is_public", options.is_public);
 
   const response = await api.post(
@@ -110,6 +111,14 @@ export const uploadDocument = async (file, options = {}) => {
       headers: { "Content-Type": "multipart/form-data" },
     }
   );
+  return response.data;
+};
+
+/**
+ * Lấy các tuỳ chọn bộ lọc (dropdown)
+ */
+export const getQuizFilters = async () => {
+  const response = await api.get("/api/quizzes/filters");
   return response.data;
 };
 
@@ -148,6 +157,24 @@ export const submitQuiz = async (quizId, answers) => {
   const response = await api.post(`/api/quizzes/${quizId}/submit`, {
     answers,
   });
+  return response.data;
+};
+
+/**
+ * Lấy lịch sử làm bài của user
+ */
+export const getMyAttempts = async (page = 1, limit = 10) => {
+  const response = await api.get('/api/quizzes/attempts/me', {
+    params: { page, limit },
+  });
+  return response.data;
+};
+
+/**
+ * Lấy chi tiết một bài đã làm
+ */
+export const getAttemptDetails = async (attemptId) => {
+  const response = await api.get(`/api/quizzes/attempts/${attemptId}`);
   return response.data;
 };
 

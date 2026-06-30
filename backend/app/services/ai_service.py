@@ -57,6 +57,10 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
 {{
   "title": "A descriptive quiz title based on the document content",
   "description": "A brief 1-2 sentence description of what the quiz covers",
+  "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
+  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
+  "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
+  "school": "Extracted school/university name or null if unknown",
   "questions": [
     {{
       "question_text": "Clear, specific question?",
@@ -92,6 +96,10 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
 {{
   "title": "A descriptive quiz title based on the document content",
   "description": "A brief 1-2 sentence description of what the quiz covers",
+  "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
+  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
+  "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
+  "school": "Extracted school/university name or null if unknown",
   "questions": [
     {{
       "question_text": "Clear, specific question?",
@@ -220,6 +228,31 @@ class DeepSeekService:
             )
 
         return quiz_data
+
+    async def extract_metadata(self, text: str) -> dict:
+        """
+        Dùng AI để trích xuất metadata từ nội dung văn bản (dùng cho chế độ extract).
+        """
+        system_prompt = """You are an expert document analyzer.
+Extract the metadata from the following source material.
+
+Return ONLY a valid JSON object matching this structure:
+{
+  "title": "A descriptive title based on the document content",
+  "description": "A brief 1-2 sentence description",
+  "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
+  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
+  "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
+  "school": "Extracted school/university name or null if unknown"
+}
+"""
+        response_text = await self._call_api_with_retry(system_prompt, text, skip_validation=True)
+        cleaned = re.sub(r"```json\s*", "", response_text)
+        cleaned = re.sub(r"\s*```", "", cleaned).strip()
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            return {}
 
     @retry(
         stop=stop_after_attempt(3),

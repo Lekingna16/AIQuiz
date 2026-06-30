@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Brain, Search, Filter, Play, UploadCloud } from "lucide-react";
-import { getQuizzes } from "../services/api";
+import { getQuizzes, getQuizFilters } from "../services/api";
 
 function HomePage() {
   const [quizzes, setQuizzes] = useState([]);
@@ -12,6 +12,21 @@ function HomePage() {
   const [chapter, setChapter] = useState("");
   const [examType, setExamType] = useState("");
   const [school, setSchool] = useState("");
+
+  const [filterOptions, setFilterOptions] = useState({
+    subjects: [],
+    chapters: [],
+    schools: [],
+  });
+
+  const fetchFilters = async () => {
+    try {
+      const data = await getQuizFilters();
+      setFilterOptions(data);
+    } catch (error) {
+      console.error("Failed to fetch filter options", error);
+    }
+  };
 
   const fetchQuizzes = async () => {
     setLoading(true);
@@ -30,6 +45,10 @@ function HomePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchFilters();
+  }, []);
 
   useEffect(() => {
     fetchQuizzes();
@@ -66,22 +85,28 @@ function HomePage() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: "bold", color: "var(--text-secondary)" }}>
               <Filter size={20} /> Lọc:
             </div>
-            <input 
-              type="text" 
-              placeholder="Môn học (Toán, Lý...)" 
+            <select 
               value={subject} 
               onChange={e => setSubject(e.target.value)}
               className="form-input"
               style={{ flex: 1, minWidth: "150px" }}
-            />
-            <input 
-              type="text" 
-              placeholder="Chương / Bài" 
+            >
+              <option value="">Tất cả môn học</option>
+              {filterOptions.subjects.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select 
               value={chapter} 
               onChange={e => setChapter(e.target.value)}
               className="form-input"
               style={{ flex: 1, minWidth: "150px" }}
-            />
+            >
+              <option value="">Tất cả chương/bài</option>
+              {filterOptions.chapters.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
             <select 
               value={examType} 
               onChange={e => setExamType(e.target.value)}
@@ -92,14 +117,17 @@ function HomePage() {
               <option value="Giữa kì">Giữa kì</option>
               <option value="Cuối kì">Cuối kì</option>
             </select>
-            <input 
-              type="text" 
-              placeholder="Trường học" 
+            <select 
               value={school} 
               onChange={e => setSchool(e.target.value)}
               className="form-input"
               style={{ flex: 1, minWidth: "150px" }}
-            />
+            >
+              <option value="">Tất cả trường học</option>
+              {filterOptions.schools.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
 
           {loading ? (

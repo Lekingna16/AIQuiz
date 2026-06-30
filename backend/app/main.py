@@ -145,11 +145,10 @@ app.include_router(comments.router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Global exception handler for unexpected errors.
-    Returns a standardized 500 JSON response instead of a raw traceback.
-    """
-    # In a real app, you would log the traceback here using logging
+    import traceback
+    with open("global_error.txt", "a", encoding="utf-8") as f:
+        f.write(f"Global Error on {request.url}:\\n")
+        f.write(traceback.format_exc() + "\\n")
     return JSONResponse(
         status_code=500,
         content={"detail": "An unexpected server error occurred. Please try again later."},

@@ -25,7 +25,7 @@ from app.models.quiz import (
     AnswerResult,
 )
 from app.models.user import UserResponse
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_user_optional
 
 
 router = APIRouter(
@@ -33,6 +33,32 @@ router = APIRouter(
     tags=["Quizzes"],
 )
 
+
+@router.get(
+    "/filters",
+    response_model=dict,
+    summary="Get filter options",
+    description="Lấy danh sách các môn học, chương, trường đang có trong database (public).",
+)
+async def get_quiz_filters(db: AsyncIOMotorDatabase = Depends(get_db)):
+    # Base query: public and approved
+    query = {"is_public": True, "is_approved": True}
+    
+    # Lấy các giá trị distinct cho từng trường
+    subjects = await db.quizzes.distinct("subject", query)
+    chapters = await db.quizzes.distinct("chapter", query)
+    schools = await db.quizzes.distinct("school", query)
+    
+    # Loại bỏ các giá trị None/rỗng
+    subjects = [s for s in subjects if s]
+    chapters = [c for c in chapters if c]
+    schools = [s for s in schools if s]
+    
+    return {
+        "subjects": sorted(subjects),
+        "chapters": sorted(chapters),
+        "schools": sorted(schools),
+    }
 
 @router.get(
     "",
@@ -191,6 +217,7 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
 async def submit_quiz(
     quiz_id: str, 
     payload: QuizSubmitRequest,
+    current_user: UserResponse | None = Depends(get_current_user_optional),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -242,19 +269,128 @@ async def submit_quiz(
     # Optional: Lưu kết quả làm bài vào quiz_attempts collection
     attempt_doc = {
         "quiz_id": ObjectId(quiz_id),
-        "user_id": None, # Will be updated in Phase 5 with auth
+        "user_id": str(current_user.id) if current_user else None,
         "answers": [{"question_id": ObjectId(q_id), "selected": user_answers_map.get(q_id)} for q_id in question_map.keys()],
         "score": score,
         "total": total,
+        "percentage": percentage,
         "completed_at": datetime.now(timezone.utc)
     }
-    await db.quiz_attempts.insert_one(attempt_doc)
+    insert_res = await db.quiz_attempts.insert_one(attempt_doc)
     
     return {
+        "attempt_id": str(insert_res.inserted_id),
         "score": score,
         "total": total,
         "percentage": round(percentage, 2),
         "results": results
+    }
+
+@router.get(
+    "/attempts/me",
+    response_model=dict,
+    summary="Get user's quiz attempts",
+    description="Lấy danh sách các lần làm bài của user hiện tại",
+)
+async def get_my_attempts(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=50),
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    import traceback
+    try:
+        skip = (page - 1) * limit
+        query = {"user_id": str(current_user.id)}
+        total = await db.quiz_attempts.count_documents(query)
+        
+        cursor = db.quiz_attempts.find(query).sort("completed_at", -1).skip(skip).limit(limit)
+        attempts = await cursor.to_list(length=limit)
+        
+        result = []
+        for att in attempts:
+            quiz = await db.quizzes.find_one({"_id": att["quiz_id"]})
+            result.append({
+                "id": str(att["_id"]),
+                "quiz_id": str(att["quiz_id"]),
+                "quiz_title": quiz["title"] if quiz else "Quiz đã xóa",
+                "score": att["score"],
+                "total": att["total"],
+                "percentage": att.get("percentage", 0),
+                "completed_at": att["completed_at"].isoformat() if "completed_at" in att and hasattr(att["completed_at"], "isoformat") else str(att.get("completed_at", ""))
+            })
+            
+        return {
+            "attempts": result,
+            "total": total,
+            "page": page,
+            "pages": math.ceil(total / limit) if limit else 0,
+        }
+    except Exception as e:
+        with open("error_log.txt", "a", encoding="utf-8") as f:
+            f.write("ERROR in get_my_attempts:\\n")
+            f.write(traceback.format_exc() + "\\n")
+        raise e
+
+@router.get(
+    "/attempts/{attempt_id}",
+    response_model=dict,
+    summary="Get specific attempt details",
+)
+async def get_attempt_details(
+    attempt_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    if not ObjectId.is_valid(attempt_id):
+        raise HTTPException(status_code=400, detail="Invalid attempt ID")
+        
+    attempt = await db.quiz_attempts.find_one({"_id": ObjectId(attempt_id), "user_id": str(current_user.id)})
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+        
+    quiz_id = str(attempt["quiz_id"])
+    quiz = await db.quizzes.find_one({"_id": attempt["quiz_id"]})
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    questions_cursor = db.questions.find({"quiz_id": quiz_id})
+    questions = await questions_cursor.to_list(length=None)
+    question_map = {str(q["_id"]): q for q in questions}
+    
+    user_answers_map = {str(a["question_id"]): a.get("selected") for a in attempt["answers"]}
+    
+    results = []
+    for q_id, q_data in question_map.items():
+        selected = user_answers_map.get(q_id)
+        correct_answer = q_data.get("correct_answer", "")
+        is_correct = (selected == correct_answer) if selected else False
+        
+        results.append({
+            "question_id": q_id,
+            "selected": selected,
+            "correct_answer": correct_answer,
+            "is_correct": is_correct,
+            "explanation": q_data.get("explanation", ""),
+        })
+        
+    return {
+        "attempt_id": str(attempt["_id"]),
+        "quiz_id": quiz_id,
+        "quiz_title": quiz["title"],
+        "score": attempt["score"],
+        "total": attempt["total"],
+        "percentage": attempt.get("percentage", 0),
+        "results": results,
+        "questions": [
+            {
+                "id": str(q["_id"]),
+                "question_text": q["question_text"],
+                "options": q["options"],
+                "order": q["order"],
+            }
+            for q in questions
+        ]
     }
 
 

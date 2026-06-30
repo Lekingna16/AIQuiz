@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle, XCircle, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import Comments from './Comments';
 
 const ResultsSummary = ({ results, score, total, percentage, quizId, questions = [] }) => {
   const [showAll, setShowAll] = useState(false);
@@ -129,6 +130,10 @@ const ResultsSummary = ({ results, score, total, percentage, quizId, questions =
                   <strong>Giải thích:</strong> {res.explanation}
                 </div>
               )}
+              
+              <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                <Comments questionId={res.question_id} />
+              </div>
             </div>
           );
         })}

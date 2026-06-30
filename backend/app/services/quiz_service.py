@@ -220,6 +220,8 @@ class QuizService:
                             "Vui lòng kiểm tra lại."
                         )
 
+                metadata = await self.gemini.extract_metadata(extracted_text[:3000])
+
                 # Tạo title/description tự động
                 desc_parts = [
                     f"Trích xuất {len(unique_questions)} câu hỏi duy nhất",
@@ -241,8 +243,12 @@ class QuizService:
                         )
                     
                 quiz_data = {
-                    "title": f"Trích xuất từ {filename}",
+                    "title": metadata.get("title") or f"Trích xuất từ {filename}",
                     "description": " ".join(desc_parts),
+                    "subject": metadata.get("subject"),
+                    "chapter": metadata.get("chapter"),
+                    "exam_type": metadata.get("exam_type"),
+                    "school": metadata.get("school"),
                     "questions": unique_questions,
                 }
             else:
@@ -264,10 +270,10 @@ class QuizService:
                 difficulty=difficulty,
                 language=language,
                 user_id=user_id,
-                subject=subject,
-                chapter=chapter,
-                exam_type=exam_type,
-                school=school,
+                subject=quiz_data.get("subject"),
+                chapter=quiz_data.get("chapter"),
+                exam_type=quiz_data.get("exam_type"),
+                school=quiz_data.get("school"),
                 is_public=is_public,
             )
             logger.info(
