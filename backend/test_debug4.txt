@@ -1,0 +1,57 @@
+L1: Chương 1: Mở đầu
+   -> Matched chapter: Chương 1: Mở đầu
+L2: Câu 1: Câu hỏi 1
+   is_new_question=True (PREFIX), num=1, text=Câu hỏi 1
+[_save_current] q_text: '', opts: 0
+   -> Continue after new question
+L3: A. 1
+   -> Appended option A
+L4: B. 2
+   -> Appended option B
+L5: C. 3
+   -> Appended option C
+L6: D. 4
+   -> Appended option D
+L7: Đáp án: A
+   -> Matched answer: A
+[_save_current] q_text: 'Câu hỏi 1', opts: 4
+   -> SAVED! Câu hỏi 1
+L9: Chương 2: Phần hai
+   -> Matched chapter: Chương 2: Phần hai
+L10: Câu 2: Câu hỏi 2
+   is_new_question=True (PREFIX), num=2, text=Câu hỏi 2
+[_save_current] q_text: '', opts: 0
+   -> Continue after new question
+L11: A. 1
+   -> Appended option A
+L12: B. 2
+   -> Appended option B
+L13: C. 3
+   -> Appended option C
+L14: D. 4
+   -> Appended option D
+L15: Đáp án: B
+   -> Matched answer: B
+[_save_current] q_text: 'Câu hỏi 2', opts: 4
+   -> SAVED! Câu hỏi 2
+L17: Bài 3: Phần ba
+   is_new_question=True (PREFIX), num=3, text=Phần ba
+[_save_current] q_text: '', opts: 0
+   -> Continue after new question
+L18: Câu 3: Câu hỏi 3
+   is_new_question=True (PREFIX), num=3, text=Câu hỏi 3
+[_save_current] q_text: 'Phần ba', opts: 0
+   -> Continue after new question
+L19: A. 1
+   -> Appended option A
+L20: B. 2
+   -> Appended option B
+L21: C. 3
+   -> Appended option C
+L22: D. 4
+   -> Appended option D
+L23: Đáp án: C
+   -> Matched answer: C
+[_save_current] q_text: 'Câu hỏi 3', opts: 4
+   -> SAVED! Câu hỏi 3
+[_save_current] q_text: '', opts: 0

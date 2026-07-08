@@ -57,7 +57,7 @@ SINGLE_OPTION_PATTERN = re.compile(
 # Pattern: đầu câu hỏi - "Câu X:" etc.
 # Dấu chấm/hai chấm/ngoặc là tuỳ chọn. Text đằng sau có thể rỗng (text nằm ở dòng dưới).
 QUESTION_PREFIX_PATTERN = re.compile(
-    r"^\s*(?:Câu|CÂU|Question|QUESTION|Q|Bài)\s*(\d{1,4})\s*[.:)]?\s*(.*)$",
+    r"^\s*(?:Câu|CÂU|Question|QUESTION|Q)\s*(\d{1,4})\s*[.:)]?\s*(.*)$",
     re.IGNORECASE,
 )
 
@@ -81,12 +81,12 @@ ANSWER_TABLE_COMPACT_PATTERN = re.compile(
 
 # Header patterns để nhận diện section bảng đáp án
 ANSWER_SECTION_HEADERS = [
-    re.compile(r"(?:BẢNG\s*)?ĐÁP\s*ÁN", re.IGNORECASE),
-    re.compile(r"ANSWER\s*KEY", re.IGNORECASE),
-    re.compile(r"Câu\s*\|\s*Đáp\s*án", re.IGNORECASE),
-    re.compile(r"Câu\s*\|\s*ĐA", re.IGNORECASE),
-    re.compile(r"STT\s*\|\s*Đáp", re.IGNORECASE),
-    re.compile(r"KEY\s*:", re.IGNORECASE),
+    re.compile(r"^\s*(?:BẢNG\s*)?ĐÁP\s*ÁN\s*$", re.IGNORECASE),
+    re.compile(r"^\s*ANSWER\s*KEY\s*$", re.IGNORECASE),
+    re.compile(r"^\s*Câu\s*\|\s*Đáp\s*án\s*$", re.IGNORECASE),
+    re.compile(r"^\s*Câu\s*\|\s*ĐA\s*$", re.IGNORECASE),
+    re.compile(r"^\s*STT\s*\|\s*Đáp\s*$", re.IGNORECASE),
+    re.compile(r"^\s*KEY\s*:\s*$", re.IGNORECASE),
 ]
 
 # Pattern nhận diện option bị tô/đánh dấu
@@ -316,16 +316,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     current_options = []
     current_answer = ""
     current_option_raw_lines = []  # Lưu raw lines của options để detect marking
-
-    # Xác định phần bảng đáp án để bỏ qua
-    table_start_line = len(lines)
-    for i, line in enumerate(lines):
-        for header_pattern in ANSWER_SECTION_HEADERS:
-            if header_pattern.search(line):
-                table_start_line = i
-                break
-        if i == table_start_line:
-            break
+    current_chapter = "Tổng hợp"
 
     def _save_current():
         """Lưu câu hỏi hiện tại nếu hợp lệ."""
@@ -342,6 +333,14 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                         final_opts.append(opt)
 
                 if len(final_opts) >= 2:
+                    # Fallback: Nếu thiếu option A (bị dính vào cuối câu hỏi do thiếu dấu chấm hoặc do ở một mình trên dòng)
+                    if final_opts[0]["key"] == "B":
+                        m = re.search(r"(?:^|\s)[Aa]\s*[.):\-]?\s+([A-ZĐ0-9].*)$", cleaned)
+                        if m:
+                            opt_a_text = m.group(1).strip()
+                            cleaned = cleaned[:m.start()].strip()
+                            final_opts.insert(0, {"key": "A", "text": opt_a_text})
+
                     answer = current_answer
                     
                     # Ưu tiên 1: đáp án inline đã tìm thấy
@@ -362,6 +361,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                         "options": final_opts[:4],
                         "correct_answer": answer,
                         "explanation": "",
+                        "chapter": current_chapter,
                     })
 
         current_q_text = ""
@@ -371,13 +371,6 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         current_option_raw_lines = []
 
     for line_idx, line in enumerate(lines):
-        # Bỏ qua bảng đáp án cuối file
-        if line_idx >= table_start_line:
-            # Lưu câu hỏi cuối cùng trước khi vào bảng
-            if current_q_text:
-                _save_current()
-            break
-
         stripped = line.strip()
         # Lưu bản gốc trước khi strip markdown (để detect bold/underline marking)
         original_stripped = stripped
@@ -387,19 +380,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         if not stripped:
             continue
 
-        # ---- 1. Check: dòng này là ĐÁP ÁN inline? ----
-        answer_found = False
-        for pattern in ANSWER_PATTERNS:
-            ans_match = pattern.search(stripped)
-            if ans_match:
-                current_answer = ans_match.group(1).upper()
-                answer_found = True
-                _save_current()
-                break
-        if answer_found:
-            continue
-
-        # ---- 2. Check: dòng này là ĐẦU CÂU HỎI MỚI? ----
+        # ---- 1. Check: dòng này là ĐẦU CÂU HỎI MỚI? ----
         is_new_question = False
         q_num = 0
         q_text = ""
@@ -416,12 +397,35 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             if q_match:
                 num = int(q_match.group(1))
                 remaining = q_match.group(2).strip()
-                # Verify: không phải option line (A.xxx B.yyy ...)
-                # và số phải hợp lý (1-999)
                 if 1 <= num <= 999:
                     q_num = num
                     q_text = remaining
                     is_new_question = True
+
+        # ---- 2. Check Chapter/Bài ----
+        if not is_new_question:
+            # Nhận diện chương/bài (chứa số, chữ số la mã, hoặc ký tự A-Z)
+            chapter_match = re.match(
+                r"^\s*(?:Chương|Bài|Phần)\s+(?:[0-9]+|[IVXLCDM]+|[A-Z])(?:\s*[:.\-]\s*|\s+|$).*$",
+                stripped,
+                re.IGNORECASE
+            )
+            if chapter_match and len(stripped) < 150 and not SINGLE_OPTION_PATTERN.match(stripped):
+                _save_current() # Lưu câu hỏi trước đó vào chương cũ trước khi chuyển chương
+                current_chapter = stripped
+                continue
+
+        # ---- 3. Check: dòng này là ĐÁP ÁN inline? ----
+        answer_found = False
+        for pattern in ANSWER_PATTERNS:
+            ans_match = pattern.search(stripped)
+            if ans_match:
+                current_answer = ans_match.group(1).upper()
+                answer_found = True
+                _save_current()
+                break
+        if answer_found:
+            continue
 
         if is_new_question:
             # Lưu câu hỏi trước đó
@@ -466,11 +470,15 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             continue
 
         # ---- 5. Dòng không match → phần tiếp theo của câu hỏi hoặc option ----
-        if current_q_num > 0 and not current_options:
-            if current_q_text:
-                current_q_text += " " + stripped
+        if current_q_num > 0:
+            if not current_options:
+                if current_q_text:
+                    current_q_text += " " + stripped
+                else:
+                    current_q_text = stripped
             else:
-                current_q_text = stripped
+                current_options[-1]["text"] += " " + stripped
+                current_option_raw_lines.append(original_stripped)
 
     # Lưu câu hỏi cuối cùng
     _save_current()

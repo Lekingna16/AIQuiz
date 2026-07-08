@@ -145,18 +145,7 @@ const FileUpload = () => {
         </div>
       </div>
       
-      <div className="form-group checkbox-group" style={{ margin: "1rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <input 
-          type="checkbox" 
-          id="isPublic"
-          checked={isPublic} 
-          onChange={(e) => setIsPublic(e.target.checked)}
-          disabled={isUploading}
-        />
-        <label htmlFor="isPublic" style={{ margin: 0, fontWeight: "normal" }}>
-          Chia sẻ công khai (Cần admin duyệt)
-        </label>
-      </div>
+
 
       {/* Khu vực Dropzone */}
       <div 

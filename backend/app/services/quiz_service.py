@@ -242,15 +242,29 @@ class QuizService:
                             f"{ai_solved} đáp án từ AI"
                         )
                     
-                quiz_data = {
-                    "title": metadata.get("title") or f"Trích xuất từ {filename}",
-                    "description": " ".join(desc_parts),
-                    "subject": metadata.get("subject"),
-                    "chapter": metadata.get("chapter"),
-                    "exam_type": metadata.get("exam_type"),
-                    "school": metadata.get("school"),
-                    "questions": unique_questions,
-                }
+                base_title = metadata.get("title") or f"Trích xuất từ {filename}"
+                
+                # Split questions by chapter
+                from collections import defaultdict
+                chapter_groups = defaultdict(list)
+                for q in unique_questions:
+                    ch = q.get("chapter", "")
+                    chapter_groups[ch].append(q)
+                
+                quiz_data_list = []
+                for ch, qs in chapter_groups.items():
+                    if not qs:
+                        continue
+                    ch_title = f"{base_title} - {ch}" if ch else base_title
+                    quiz_data_list.append({
+                        "title": ch_title,
+                        "description": " ".join(desc_parts),
+                        "subject": metadata.get("subject"),
+                        "chapter": ch if ch else metadata.get("chapter"),
+                        "exam_type": metadata.get("exam_type"),
+                        "school": metadata.get("school"),
+                        "questions": qs,
+                    })
             else:
                 # Luôn dùng AI cho generate
                 quiz_data = await self.gemini.generate_quiz(
@@ -260,25 +274,29 @@ class QuizService:
                     language=language,
                     mode=mode,
                 )
+                quiz_data_list = [quiz_data]
 
             # =====================
             # Step 5: Save quiz + questions to DB
             # =====================
-            quiz_id, question_ids = await self._save_quiz_and_questions(
-                document_id=document_id,
-                quiz_data=quiz_data,
-                difficulty=difficulty,
-                language=language,
-                user_id=user_id,
-                subject=quiz_data.get("subject"),
-                chapter=quiz_data.get("chapter"),
-                exam_type=quiz_data.get("exam_type"),
-                school=quiz_data.get("school"),
-                is_public=is_public,
-            )
-            logger.info(
-                f"Quiz saved: {quiz_id} with {len(question_ids)} questions"
-            )
+            saved_quiz_ids = []
+            for q_data in quiz_data_list:
+                qid, q_ids = await self._save_quiz_and_questions(
+                    document_id=document_id,
+                    quiz_data=q_data,
+                    difficulty=difficulty,
+                    language=language,
+                    user_id=user_id,
+                    subject=q_data.get("subject"),
+                    chapter=q_data.get("chapter"),
+                    exam_type=q_data.get("exam_type"),
+                    school=q_data.get("school"),
+                    is_public=True, # Tự động public và approved
+                )
+                saved_quiz_ids.append(qid)
+                logger.info(f"Quiz saved: {qid} with {len(q_ids)} questions")
+
+            quiz_id = saved_quiz_ids[0] if saved_quiz_ids else None
 
             # =====================
             # Step 6: Update document status → completed
@@ -288,7 +306,11 @@ class QuizService:
             # =====================
             # Step 7: Build response
             # =====================
+            if not quiz_id:
+                raise ValueError("Không tìm thấy câu hỏi hợp lệ để tạo quiz")
             response = await self._build_response(quiz_id, document_id)
+            if len(saved_quiz_ids) > 1:
+                response["all_quiz_ids"] = saved_quiz_ids
             return response
 
         except Exception as e:
@@ -458,7 +480,7 @@ Return ONLY a valid JSON object matching this structure:
             "exam_type": exam_type,
             "school": school,
             "is_public": is_public,
-            "is_approved": False, # Mặc định cần admin duyệt nếu public
+            "is_approved": True, # Mặc định approved
             "created_at": datetime.now(timezone.utc),
         }
         quiz_result = await self.db.quizzes.insert_one(quiz_doc)

@@ -53,7 +53,7 @@ const Header = () => {
             <div className="user-profile">
               <div className="user-info">
                 {user.picture ? (
-                  <img src={user.picture} alt={user.full_name} className="user-avatar" />
+                  <img src={user.picture} alt={user.full_name} className="user-avatar" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="user-avatar-placeholder">
                     <UserIcon size={16} />

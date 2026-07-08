@@ -9,6 +9,7 @@ class UserInDB(BaseModel):
     email: EmailStr
     full_name: str
     picture: Optional[str] = None
+    role: str = "user"  # "user" or "admin"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
 class UserResponse(BaseModel):
@@ -17,3 +18,4 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     picture: Optional[str] = None
+    role: str = "user"

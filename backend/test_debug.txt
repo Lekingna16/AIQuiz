@@ -1,0 +1,56 @@
+Line 0: ''
+Line 1: 'Chương 1: Mở đầu'
+  is_new_question=False
+  -> Matched chapter! Chương 1: Mở đầu
+Line 2: 'Câu 1: Câu hỏi 1'
+  is_new_question=True
+  [SAVE] Calling _save_current! q_text='', options=0
+    -> REJECTED
+  -> Started new Q: 1
+Line 3: 'A. 1'
+  is_new_question=False
+  -> Matched option!
+Line 4: 'B. 2'
+  is_new_question=False
+  -> Matched option!
+Line 5: 'C. 3'
+  is_new_question=False
+  -> Matched option!
+Line 6: 'D. 4'
+  is_new_question=False
+  -> Matched option!
+Line 7: 'Đáp án: A'
+  is_new_question=False
+  -> Matched answer!
+  [SAVE] Calling _save_current! q_text='Câu hỏi 1', options=4
+    -> SAVED: Câu hỏi 1 (Chương 1: Mở đầu)
+Line 8: ''
+Line 9: 'Chương 2: Phần hai'
+  is_new_question=False
+  -> Matched chapter! Chương 2: Phần hai
+Line 10: 'Câu 2: Câu hỏi 2'
+  is_new_question=True
+  [SAVE] Calling _save_current! q_text='', options=0
+    -> REJECTED
+  -> Started new Q: 2
+Line 11: 'A. 1'
+  is_new_question=False
+  -> Matched option!
+Line 12: 'B. 2'
+  is_new_question=False
+  -> Matched option!
+Line 13: 'C. 3'
+  is_new_question=False
+  -> Matched option!
+Line 14: 'D. 4'
+  is_new_question=False
+  -> Matched option!
+Line 15: 'Đáp án: B'
+  is_new_question=False
+  -> Matched answer!
+  [SAVE] Calling _save_current! q_text='Câu hỏi 2', options=4
+    -> SAVED: Câu hỏi 2 (Chương 2: Phần hai)
+Line 16: ''
+  [SAVE] Calling _save_current! q_text='', options=0
+    -> REJECTED
+Total: 2
