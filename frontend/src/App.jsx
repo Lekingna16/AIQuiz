@@ -20,6 +20,7 @@ import HomePage from "./pages/HomePage";
 import QuizPage from "./pages/QuizPage";
 import HistoryPage from "./pages/HistoryPage";
 import UploadPage from "./pages/UploadPage";
+import GeneratePage from "./pages/GeneratePage";
 import AttemptPage from "./pages/AttemptPage";
 
 import Header from "./components/Header";
@@ -51,6 +52,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/upload" element={<UploadPage />} />
+          <Route path="/generate" element={<GeneratePage />} />
           <Route path="/quiz/:quizId" element={<QuizPage />} />
           <Route path="/attempt/:attemptId" element={<AttemptPage />} />
           <Route path="/history" element={<HistoryPage />} />

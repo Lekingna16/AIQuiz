@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Send, User as UserIcon, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { getComments, addComment } from "../services/api";
 import useAuthStore from "../store/authStore";
 
@@ -35,11 +36,11 @@ const Comments = ({ questionId }) => {
     try {
       const data = {
         content: newComment,
-        guest_name: !isAuthenticated ? (guestName || "Khách") : undefined,
+        guest_name: !isAuthenticated ? "Người dùng" : undefined,
       };
-      const createdComment = await addComment(questionId, data);
-      setComments([...comments, createdComment]);
+      await addComment(questionId, data);
       setNewComment("");
+      await fetchComments();
     } catch (error) {
       console.error("Lỗi khi thêm bình luận", error);
     } finally {
@@ -53,16 +54,6 @@ const Comments = ({ questionId }) => {
       
       {/* Comment Form */}
       <form onSubmit={handleSubmit} className="comment-form" style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1.5rem" }}>
-        {!isAuthenticated && (
-          <input
-            type="text"
-            placeholder="Tên của bạn (Tùy chọn)"
-            value={guestName}
-            onChange={(e) => setGuestName(e.target.value)}
-            className="form-input"
-            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--border-color)", maxWidth: "300px" }}
-          />
-        )}
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <input
             type="text"
@@ -101,7 +92,9 @@ const Comments = ({ questionId }) => {
                     {new Date(comment.created_at).toLocaleDateString('vi-VN')}
                   </span>
                 </div>
-                <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.95rem" }}>{comment.content}</p>
+                <div style={{ margin: "0.2rem 0 0 0", fontSize: "0.95rem" }} className="comment-content">
+                  <ReactMarkdown>{comment.content}</ReactMarkdown>
+                </div>
               </div>
             </div>
           ))

@@ -67,7 +67,7 @@ function HomePage() {
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
             <Link to="/upload" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.8rem 1.5rem", fontSize: "1.1rem" }}>
-              <UploadCloud size={20} /> Tạo & Đóng góp tài liệu
+              <UploadCloud size={20} /> Upload tài liệu của bạn
             </Link>
           </div>
         </div>

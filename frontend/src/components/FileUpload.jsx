@@ -5,13 +5,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { uploadDocument } from "../services/api";
 
-const FileUpload = () => {
+const FileUpload = ({ forcedMode }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [numQuestions, setNumQuestions] = useState(10);
   const [difficulty, setDifficulty] = useState("mixed");
   const [language, setLanguage] = useState("vi");
-  const [mode, setMode] = useState("generate");
+  const [mode, setMode] = useState(forcedMode || "generate");
   const [isPublic, setIsPublic] = useState(false);
   
   const navigate = useNavigate();
@@ -87,24 +87,26 @@ const FileUpload = () => {
   return (
     <div className="file-upload-container card">
       {/* Chế độ hoạt động */}
-      <div className="mode-selector" style={{ marginBottom: "var(--spacing-md)", display: "flex", gap: "var(--spacing-md)" }}>
-        <button 
-          className={`btn ${mode === "generate" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setMode("generate")}
-          disabled={isUploading}
-          style={{ flex: 1, padding: "var(--spacing-sm)" }}
-        >
-          Sinh câu hỏi mới
-        </button>
-        <button 
-          className={`btn ${mode === "extract" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setMode("extract")}
-          disabled={isUploading}
-          style={{ flex: 1, padding: "var(--spacing-sm)" }}
-        >
-          Trích xuất & Lọc trùng
-        </button>
-      </div>
+      {!forcedMode && (
+        <div className="mode-selector" style={{ marginBottom: "var(--spacing-md)", display: "flex", gap: "var(--spacing-md)" }}>
+          <button 
+            className={`btn ${mode === "generate" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setMode("generate")}
+            disabled={isUploading}
+            style={{ flex: 1, padding: "var(--spacing-sm)" }}
+          >
+            Sinh câu hỏi mới
+          </button>
+          <button 
+            className={`btn ${mode === "extract" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setMode("extract")}
+            disabled={isUploading}
+            style={{ flex: 1, padding: "var(--spacing-sm)" }}
+          >
+            Trích xuất & Lọc trùng
+          </button>
+        </div>
+      )}
 
       {/* Cấu hình Quiz */}
       <div className="quiz-config">

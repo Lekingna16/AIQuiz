@@ -45,10 +45,10 @@ async def create_comment(
         raise HTTPException(status_code=400, detail="Invalid question ID")
         
     user_id = str(current_user.id) if current_user else None
-    guest_name = payload.guest_name if not current_user else current_user.name
+    guest_name = payload.guest_name if not current_user else current_user.full_name
 
     if not user_id and not guest_name:
-        guest_name = "Khách"
+        guest_name = "Người dùng"
 
     comment_doc = {
         "question_id": question_id,
@@ -61,4 +61,32 @@ async def create_comment(
     result = await db.comments.insert_one(comment_doc)
     comment_doc["id"] = str(result.inserted_id)
     comment_doc["created_at"] = comment_doc["created_at"].isoformat()
+
+    # Sinh AI reply
+    question = await db.questions.find_one({"_id": ObjectId(question_id)})
+    if question:
+        try:
+            from app.config import get_settings
+            from app.services.ai_service import DeepSeekService
+            
+            settings = get_settings()
+            ai_service = DeepSeekService(api_key=settings.DEEPSEEK_API_KEY)
+            ai_reply = await ai_service.discuss_question(
+                question_text=question.get("question_text", ""),
+                options=question.get("options", []),
+                correct_answer=question.get("correct_answer", "Không rõ"),
+                user_comment=payload.content
+            )
+            
+            ai_comment = {
+                "question_id": question_id,
+                "user_id": "ai_tutor",
+                "guest_name": "AI Tutor 🤖",
+                "content": ai_reply,
+                "created_at": datetime.now(timezone.utc)
+            }
+            await db.comments.insert_one(ai_comment)
+        except Exception as e:
+            pass # Bỏ qua nếu lỗi, không làm gián đoạn request của user
+
     return comment_doc

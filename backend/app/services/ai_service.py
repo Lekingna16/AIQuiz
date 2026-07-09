@@ -441,3 +441,41 @@ Return ONLY a valid JSON object matching this structure:
                         f"Question {i + 1}, Option {opt.get('key')}: "
                         f"text is empty"
                     )
+
+    async def discuss_question(self, question_text: str, options: list, correct_answer: str, user_comment: str) -> str:
+        """
+        AI Tutor: giải thích đáp án cho học viên.
+        """
+        options_text = "\n".join([f"{opt.get('key', '')}. {opt.get('text', '')}" for opt in options])
+        system_prompt = f"""You are a helpful and expert AI tutor for a quiz application.
+A user is discussing a specific multiple-choice question.
+Your goal is to answer their question, explain the concepts, or clarify why the correct answer is correct.
+Keep your answer friendly, educational, concise, and ONLY in Vietnamese language.
+
+## QUESTION:
+{question_text}
+
+## OPTIONS:
+{options_text}
+
+## CORRECT ANSWER:
+{correct_answer}
+"""
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_comment},
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000,
+                ),
+                timeout=30,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"AI discussion failed: {e}")
+            return "Xin lỗi, hiện tại tôi không thể trả lời. Vui lòng thử lại sau."

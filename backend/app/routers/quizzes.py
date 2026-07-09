@@ -267,19 +267,22 @@ async def submit_quiz(
     percentage = (score / total) * 100 if total > 0 else 0
     
     # Optional: Lưu kết quả làm bài vào quiz_attempts collection
-    attempt_doc = {
-        "quiz_id": ObjectId(quiz_id),
-        "user_id": str(current_user.id) if current_user else None,
-        "answers": [{"question_id": ObjectId(q_id), "selected": user_answers_map.get(q_id)} for q_id in question_map.keys()],
-        "score": score,
-        "total": total,
-        "percentage": percentage,
-        "completed_at": datetime.now(timezone.utc)
-    }
-    insert_res = await db.quiz_attempts.insert_one(attempt_doc)
+    attempt_id = None
+    if current_user:
+        attempt_doc = {
+            "quiz_id": ObjectId(quiz_id),
+            "user_id": str(current_user.id),
+            "answers": [{"question_id": ObjectId(q_id), "selected": user_answers_map.get(q_id)} for q_id in question_map.keys()],
+            "score": score,
+            "total": total,
+            "percentage": percentage,
+            "completed_at": datetime.now(timezone.utc)
+        }
+        insert_res = await db.quiz_attempts.insert_one(attempt_doc)
+        attempt_id = str(insert_res.inserted_id)
     
     return {
-        "attempt_id": str(insert_res.inserted_id),
+        "attempt_id": attempt_id,
         "score": score,
         "total": total,
         "percentage": round(percentage, 2),

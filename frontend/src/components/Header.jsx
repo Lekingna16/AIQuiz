@@ -8,23 +8,6 @@ import useAuthStore from '../store/authStore';
 
 const Header = () => {
   const { user, isAuthenticated, login, logout } = useAuthStore();
-  const [isDark, setIsDark] = useState(() => {
-    // Check local storage or system preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) return savedTheme === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    // Apply theme
-    if (isDark) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDark]);
 
   return (
     <header className="app-header">
@@ -34,20 +17,13 @@ const Header = () => {
         </Link>
         
         <nav className="header-nav">
-          <Link to="/upload" className="nav-link">Tạo câu hỏi</Link>
+          <Link to="/upload" className="nav-link">Upload tài liệu</Link>
+          <Link to="/generate" className="nav-link" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <span style={{ color: "var(--primary-color)", fontWeight: "bold" }}>✨ AI</span> Sinh câu hỏi
+          </Link>
           <Link to="/history" className="nav-link">Lịch sử</Link>
 
-          <button 
-            className="theme-toggle" 
-            onClick={() => setIsDark(!isDark)}
-            aria-label="Toggle theme"
-          >
-            <div className={`theme-toggle-track ${isDark ? 'dark' : 'light'}`}>
-              <div className="theme-toggle-thumb">
-                {isDark ? <Moon size={14} className="icon-moon" /> : <Sun size={14} className="icon-sun" />}
-              </div>
-            </div>
-          </button>
+
           
           {isAuthenticated && user ? (
             <div className="user-profile">
@@ -90,7 +66,7 @@ const Header = () => {
               }}
               useOneTap
               shape="pill"
-              theme={isDark ? "filled_black" : "outline"}
+              theme="outline"
             />
           )}
         </nav>

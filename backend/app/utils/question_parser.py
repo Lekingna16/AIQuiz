@@ -51,7 +51,8 @@ ANSWER_PATTERNS = [
 
 # Pattern: option ở đầu dòng riêng
 SINGLE_OPTION_PATTERN = re.compile(
-    r"^\s*([A-Da-d])\s*[.):\-]\s*(.+?)$"
+    r"^\s*(?:đáp\s*án\s*)?([A-Da-d])\s*[.):\-]\s*(.+?)$",
+    re.IGNORECASE
 )
 
 # Pattern: đầu câu hỏi - "Câu X:" etc.
@@ -105,6 +106,11 @@ MARKED_OPTION_CHECK = re.compile(
 # Dấu tích sau option key: "A. ✓ text" hoặc "A. √ text"
 MARKED_OPTION_CHECK_AFTER = re.compile(
     r"^\s*([A-Da-d])\s*[.):\-]\s*(?:[✓✔√☑]|\[x\]|\(x\))\s*(.+?)$",
+    re.IGNORECASE,
+)
+# Đáp án ngay trước option: "đáp án a) text"
+MARKED_OPTION_DAPAN_PREFIX = re.compile(
+    r"^\s*đáp\s*án\s*([A-Da-d])\s*[.):\-]\s*(.+?)$",
     re.IGNORECASE,
 )
 
@@ -258,6 +264,11 @@ def _detect_marked_answer(options: list[dict], raw_lines: list[str]) -> str:
         m = MARKED_OPTION_CHECK_AFTER.match(stripped)
         if m:
             return m.group(1).upper()
+            
+        # Check prefix "đáp án"
+        m = MARKED_OPTION_DAPAN_PREFIX.match(stripped)
+        if m:
+            return m.group(1).upper()
     
     return ""
 
@@ -275,7 +286,7 @@ def _extract_options_from_line(line: str) -> list[dict]:
     # Tìm tất cả vị trí bắt đầu option trong dòng
     # Pattern: chữ cái A-D (hoặc a-d) theo sau bởi dấu .):-
     option_starts = []
-    for m in re.finditer(r"(?:^|\s)([A-Da-d])\s*[.):\-]\s*", line):
+    for m in re.finditer(r"(?:^|\s)(?:đáp\s*án\s*)?([A-Da-d])\s*[.):\-]\s*", line, re.IGNORECASE):
         key = m.group(1).upper()
         if key in {"A", "B", "C", "D"}:
             option_starts.append({
@@ -335,7 +346,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                 if len(final_opts) >= 2:
                     # Fallback: Nếu thiếu option A (bị dính vào cuối câu hỏi do thiếu dấu chấm hoặc do ở một mình trên dòng)
                     if final_opts[0]["key"] == "B":
-                        m = re.search(r"(?:^|\s)[Aa]\s*[.):\-]?\s+([A-ZĐ0-9].*)$", cleaned)
+                        m = re.search(r"(?:^|\s)(?:đáp\s*án\s*)?[Aa]\s*[.):\-]?\s+([A-ZĐ0-9].*)$", cleaned, re.IGNORECASE)
                         if m:
                             opt_a_text = m.group(1).strip()
                             cleaned = cleaned[:m.start()].strip()
@@ -437,7 +448,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             inline_opts = _extract_options_from_line(q_text)
             if inline_opts:
                 # Tìm vị trí option đầu tiên trong q_text để tách question
-                first_opt_match = re.search(r"(?:^|\s)[A-Da-d]\s*[.):\-]\s*", q_text)
+                first_opt_match = re.search(r"(?:^|\s)(?:đáp\s*án\s*)?[A-Da-d]\s*[.):\-]\s*", q_text, re.IGNORECASE)
                 if first_opt_match:
                     current_q_text = q_text[:first_opt_match.start()].strip()
                 else:

@@ -235,4 +235,1164 @@ AttributeError: 'UserResponse' object has no attribute 'name'
   File "E:\personal project\AIQuiz\backend\venv\Lib\site-packages\pydantic\main.py", line 1042, in __getattr__
     raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
 AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f75b98d650e0831427809:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f75b98d650e0831427809:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f75b98d650e08314277f8:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f75b98d650e08314277f8:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f75b98d650e08314277f8:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
+\nGlobal Error on http://localhost:8000/api/comments/question/6a4f78b316b186921fe79340:\nTraceback (most recent call last):
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\starlette\routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\personal project\AIQuiz\backend\app\routers\comments.py", line 48, in create_comment
+    guest_name = payload.guest_name if not current_user else current_user.name
+                                                             ^^^^^^^^^^^^^^^^^
+  File "C:\Users\ASUS\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'UserResponse' object has no attribute 'name'
 \n
