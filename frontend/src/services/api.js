@@ -65,7 +65,10 @@ api.interceptors.response.use(
     // Phân loại lỗi để hiển thị message phù hợp
     if (error.response) {
       // Nếu lỗi 401 hoặc 403 (Hết hạn token, user bị xóa, hoặc thiếu token), force logout
-      if (error.response.status === 401 || error.response.status === 403) {
+      // NHƯNG bỏ qua nếu đang gọi endpoint đăng nhập (auth) — vì 401 ở login là lỗi xác thực, không phải hết hạn token
+      const requestUrl = error.config?.url || '';
+      const isAuthRequest = requestUrl.includes('/api/auth/');
+      if ((error.response.status === 401 || error.response.status === 403) && !isAuthRequest) {
         localStorage.removeItem('auth-storage');
         window.location.href = '/';
       }

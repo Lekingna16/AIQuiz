@@ -1,0 +1,7 @@
+--- QUIZZES SUMMARY ---
+Quiz ID: 6a5f0d851af07b3a5bf926d6 | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 06:11:17.143000
+Quiz ID: 6a5f0d6b1af07b3a5bf926ca | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 06:10:51.462000
+Quiz ID: 6a5f0ce01af07b3a5bf926be | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 06:08:32.328000
+Quiz ID: 6a5f08551af07b3a5bf926b2 | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 05:49:09.625000
+Quiz ID: 6a5efe1d1a2d862be9b788d2 | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 05:05:33.374000
+Quiz ID: 6a5efe061a2d862be9b788c6 | Title: Trắc nghiệm Tư tưởng Hồ Chí Minh | total_questions field: 10 | Questions in DB (ObjectId): 0 | Questions in DB (string): 10 | Created: 2026-07-21 05:05:10.234000

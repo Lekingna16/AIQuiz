@@ -354,7 +354,7 @@ class QuizService:
     async def _solve_missing_answers_with_ai(self, questions: list[dict]) -> list[dict]:
         """
         Gửi các câu hỏi thiếu đáp án lên AI để giải.
-        Xử lý theo batch (30 câu/batch) để tránh timeout với file lớn.
+        Xử lý song song các batch (30 câu/batch) với Semaphore để tối ưu tốc độ và tránh timeout.
         
         Returns: list of dicts with 'correct_answer' and 'explanation' 
                  IN THE SAME ORDER as input questions.
@@ -373,11 +373,9 @@ class QuizService:
                 batch_items.append((j, questions[j]))
             batches.append(batch_items)
         
-        logger.info(f"Splitting {len(questions)} questions into {len(batches)} batches")
+        logger.info(f"Splitting {len(questions)} questions into {len(batches)} batches for concurrent solving")
         
-        for batch_idx, batch in enumerate(batches):
-            logger.info(f"Processing batch {batch_idx + 1}/{len(batches)} ({len(batch)} questions)")
-            
+        async def solve_batch(batch_idx, batch):
             # Tạo payload rút gọn, đánh số thứ tự rõ ràng
             payload = []
             for idx_in_batch, (original_idx, q) in enumerate(batch):
@@ -433,14 +431,10 @@ Return ONLY a valid JSON object matching this structure:
                     if ai_index is not None and 1 <= ai_index <= len(batch):
                         original_idx = batch[ai_index - 1][0]  # index gốc trong questions[]
                         all_solved[original_idx] = solved_q
-                    else:
-                        # Fallback: nếu AI không trả index, dùng thứ tự
-                        pass
                 
                 # Fallback: nếu không có index, map theo thứ tự xuất hiện
                 items_without_index = [s for s in batch_solved if s.get("index") is None]
                 if items_without_index and len(items_without_index) == len(batch):
-                    # AI không trả index → map theo thứ tự
                     for i, (original_idx, _) in enumerate(batch):
                         if i < len(batch_solved):
                             all_solved[original_idx] = batch_solved[i]
@@ -448,8 +442,15 @@ Return ONLY a valid JSON object matching this structure:
                 logger.info(f"Batch {batch_idx + 1}: solved {len(batch_solved)} questions")
             except Exception as e:
                 logger.error(f"Batch {batch_idx + 1} failed: {e}")
-                # Tiếp tục các batch còn lại
-                continue
+
+        # Giới hạn tối đa 5 requests song song cùng lúc
+        sem = asyncio.Semaphore(5)
+        async def solve_batch_with_sem(batch_idx, batch):
+            async with sem:
+                await solve_batch(batch_idx, batch)
+
+        tasks = [solve_batch_with_sem(idx, b) for idx, b in enumerate(batches)]
+        await asyncio.gather(*tasks)
         
         return all_solved
 

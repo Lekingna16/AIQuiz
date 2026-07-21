@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
-import { LogOut, User as UserIcon, Moon, Sun, Menu, X, UploadCloud, Sparkles, History } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, X, UploadCloud, Sparkles, History } from 'lucide-react';
 import { toast } from 'sonner';
-import { loginWithGoogle, loginMock } from '../services/api';
+import { loginWithGoogle } from '../services/api';
 import useAuthStore from '../store/authStore';
 
 const Header = () => {
@@ -36,8 +36,6 @@ const Header = () => {
             <History size={18} /> Lịch sử
           </Link>
 
-
-          
           {isAuthenticated && user ? (
             <div className="user-profile">
               <div className="user-info">
@@ -63,42 +61,33 @@ const Header = () => {
               </button>
             </div>
           ) : (
-            <div className="auth-wrapper" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <GoogleLogin
-                onSuccess={async (credentialResponse) => {
-                  try {
-                    const data = await loginWithGoogle(credentialResponse.credential);
-                    login(data.user, data.access_token);
-                    toast.success(`Xin chào, ${data.user.full_name}!`);
-                  } catch (error) {
-                    const errorMsg = error.response?.data?.detail || 'Lỗi xác thực từ Server';
-                    toast.error(errorMsg);
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const data = await loginWithGoogle(credentialResponse.credential);
+                  login(data.user, data.access_token);
+                  toast.success(`Xin chào, ${data.user.full_name}!`);
+                } catch (error) {
+                  let errorMsg = 'Đăng nhập thất bại. Vui lòng thử lại.';
+                  if (error.friendlyMessage) {
+                    errorMsg = error.friendlyMessage;
+                  } else if (error.response?.data?.detail) {
+                    errorMsg = String(error.response.data.detail);
+                  } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                    errorMsg = 'Không thể kết nối tới server. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.';
+                  } else if (error.code === 'ECONNABORTED') {
+                    errorMsg = 'Yêu cầu đăng nhập đã hết thời gian chờ. Vui lòng thử lại.';
                   }
-                }}
-                onError={() => {
-                  toast.error('Đăng nhập Google thất bại');
-                }}
-                useOneTap
-                shape="pill"
-                theme="outline"
-              />
-              <button
-                className="btn btn-secondary"
-                onClick={async () => {
-                  try {
-                    const data = await loginMock();
-                    login(data.user, data.access_token);
-                    toast.success(`Xin chào, ${data.user.full_name}! (Mock User)`);
-                  } catch (error) {
-                    const errorMsg = error.response?.data?.detail || 'Lỗi đăng nhập Mock';
-                    toast.error(errorMsg);
-                  }
-                }}
-                style={{ padding: '6px 12px', fontSize: '14px', borderRadius: '9999px', whiteSpace: 'nowrap' }}
-              >
-                Mock Login
-              </button>
-            </div>
+                  toast.error(errorMsg);
+                }
+              }}
+              onError={() => {
+                toast.error('Đăng nhập Google thất bại. Vui lòng kiểm tra kết nối mạng và thử lại.');
+              }}
+              useOneTap
+              shape="pill"
+              theme="outline"
+            />
           )}
         </nav>
       </div>

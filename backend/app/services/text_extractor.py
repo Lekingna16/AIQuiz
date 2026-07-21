@@ -27,7 +27,7 @@ from docx import Document
 TCVN3_CHARS = "µ¸¶·¹¨»¾¼½Æ©ÇÊÈÉË®ÌÐÎÏÑªÒÕÓÔÖ×ÝØÜÞßãáâä«åèæçé¬êíëìîïóñòô\u00adõøö÷ùúýûüþ¡¢§£¤¥¦"
 UNICODE_CHARS = "àáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵĂÂĐÊÔƠƯ"
 TCVN3_EXTRA = "\u03bc\u2212"
-UNICODE_EXTRA = "àu"
+UNICODE_EXTRA = "àư"
 
 tcvn3_to_unicode_map = dict(zip(TCVN3_CHARS + TCVN3_EXTRA, UNICODE_CHARS + UNICODE_EXTRA))
 
@@ -98,6 +98,10 @@ class TextExtractor:
         # Gọi method tương ứng
         extractor = getattr(self, extractor_name)
         raw_text = extractor(file_bytes)
+
+        # Tự động chuyển đổi TCVN3 sang Unicode nếu phát hiện
+        if _is_tcvn3(raw_text):
+            raw_text = _tcvn3_to_unicode(raw_text)
 
         # Clean text: bỏ whitespace thừa, normalize line breaks
         cleaned = self._clean_text(raw_text)

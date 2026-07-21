@@ -1,0 +1,31 @@
+--- QUIZ INFO ---
+{
+  "_id": "6a5f0d851af07b3a5bf926d6",
+  "document_id": "6a5f0d7b1af07b3a5bf926d5",
+  "user_id": "6a5f0b520490c0256cfda139",
+  "title": "Trắc nghiệm Tư tưởng Hồ Chí Minh",
+  "description": "Bộ câu hỏi trắc nghiệm về cuộc đời và sự nghiệp của Chủ tịch Hồ Chí Minh, từ thời niên thiếu đến khi ra đi tìm đường cứu nước.",
+  "total_questions": 10,
+  "difficulty": "mixed",
+  "language": "vi",
+  "subject": "Tư tưởng Hồ Chí Minh",
+  "chapter": null,
+  "exam_type": null,
+  "school": null,
+  "is_public": true,
+  "is_approved": true,
+  "created_at": "2026-07-21T06:11:17.143000"
+}
+
+--- DOCUMENT INFO ---
+{
+  "_id": "6a5f0d7b1af07b3a5bf926d5",
+  "original_filename": "ngan-hang-500-cau-tu-tuong-ho-chi-minh (co dap an).pdf",
+  "file_type": "pdf",
+  "file_size_bytes": 1314063,
+  "extracted_text": "PhÇn V\nt− t−ëng hå chÝ minh\n\n\nA - c©u hái tr¾c nghiÖm\n\nC©u 1. Th©n phô Hå ChÝ Minh lμ NguyÔn Sinh S¾c. ¤ng sinh n¨m nμo?\na. 1860\nb. 1862\nc. 1863\nd. 1883\nC©u 2. Th©n mÉu Hå ChÝ Minh lμ Hoμng ThÞ Loan. Bμ sinh n¨m nμo?\na. 1 865\nb. 1866\nc. 1868\nd. 1870\nC©u 3. HuyÖn B×nh Khª, n¬i Cô NguyÔn Sinh S¾c, th©n phô Hå ChÝ Minh cã thêi\nkú lμm tri huyÖn thuéc tØnh nμo?\na. Qu¶ng Nam\nb. Qu¶ng Ng·i\nc. B×nh §Þnh\nd. Phan ThiÕt\nC©u 4. Th©n phô cña Hå ChÝ Minh lμ NguyÔn Sinh S¾c, cô mÊt vμo n¨m nμo?\na. 1919\nb. 1929\nc. 1939\nd. 1949\nC©u 5. Th©n phô Hå ChÝ Minh lμ NguyÔn Sinh S¾c, Cô qua ®êi t¹i ®©u?\na. Long Xuyªn\nb. An Giang\nc. §ång Nai\nd. Cao L·nh\nC©u 6. Th©n mÉu Hå ChÝ Minh lμ bμ Hoμng ThÞ Loan, bμ mÊt n¨m nμo?\na. 1891\nb. 1901\nc. 1911\nd. 1921\nC©u 7. Th©n mÉu Hå  ChÝ Minh lμ bμ Hoμng ThÞ Loan, bμ mÊt ë ®©u?\na. NghÖ An\nb. Hμ TÜnh\nc. HuÕ\nd. B×nh §Þnh\nC©u 8. Th©n mÉu Hå ChÝ Minh lμ bμ Hoμng ThÞ Loan, bμ sinh ®−îc mÊy ng−êi con?\na. Mét\nb. Hai\nc. Ba\nd. Bèn\n\n357\n\n\nC©u 9. NguyÔn Sinh Cung (Hå ChÝ Minh) ®Õn HuÕ lÇn thø nhÊt vμo n¨m nμo?\na. 1895\nb. 1896\nc 1898\nd. 1901\nC©u 10. Th©n phô NguyÔn Sinh S¾c lμm lÔ “vμo lμng” cho Sinh Cung víi tªn míi lμ\nNguyÔn TÊt Thμnh vμo thêi gian nμo?\na. N¨m 1890\nb. N¨m 1901\nc. N¨m 1902\nd. N¨m 1911\nC©u 11. NguyÔn TÊt Thμnh ®Õn HuÕ lÇn thø 2 n¨m nμo?\na. 1904\nb. 1905\nc. 1906\nd. 1908\nC©u 12. Ng−êi thÇy gi¸o ®Çu tiªn cña NguyÔn TÊt Thμnh lμ ai?\na. V−¬ng Thóc QuÝ\nb. NguyÔn Sinh S¾c\nc. TrÇn TÊn\nd. Phan Béi Ch©u\nC©u 13. NguyÔn TÊt Thμnh vμo häc tr−êng Ph¸p-ViÖt §«ng Ba n¨m nμo?\na. 9/1905\nb. 9/1906\nc. 9/1907\nd. 9/1908\nC©u 14. NguyÔn TÊt Thμnh häc t¹i tr−êng Quèc häc HuÕ n¨m häc nμo?\na. N¨m häc 1905-1906\nb. N¨m häc 1906-1907\nc. N¨m häc 1907-1908\nd. N¨m häc 1911-1912\nC©u 15. NguyÔn TÊt Thμnh lÇn ®Çu tiªn tiÕp xóc víi khÈu hiÖu: “Tù do- B×nh ®¼ng-\nB¸c ¸i”  vμo n¨m nμo?\na. 1904\nb. 1905\nc. 1908\nd. 1917\nC©u 16. NguyÔn TÊt Thμnh ®· tham dù cuéc biÓu t×nh chèng thuÕ cña n«ng d©n\ntØnh Thõa Thiªn vμo thêi gian nμo?\na. 5/1905\nb. 5/1906\nc. 5/1908\nd. 5/1911\nC©u 17. NguyÔn TÊt Thμnh ®Õn... [TRUNCATED]",
+  "text_length": 116034,
+  "upload_status": "completed",
+  "user_id": "6a5f0b520490c0256cfda139",
+  "created_at": "2026-07-21T06:11:07.338000"
+}
