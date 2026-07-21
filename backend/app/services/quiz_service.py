@@ -171,100 +171,105 @@ class QuizService:
                 logger.info(f"After dedup: {len(unique_questions)} unique questions")
 
                 if not unique_questions:
-                    raise QuizGenerationError(
-                        "Không tìm thấy câu hỏi trắc nghiệm trong file. "
-                        "Hãy đảm bảo file có format: Câu 1: ... A. ... B. ... C. ... D. ..."
+                    logger.warning("Không tìm thấy câu hỏi bằng Regex. Chuyển sang dùng AI (DeepSeek) để nhận diện format động (Fallback)...")
+                    quiz_data = await self.gemini.generate_quiz(
+                        text=processed_text,
+                        num_questions=num_questions,
+                        difficulty=difficulty,
+                        language=language,
+                        mode="extract",
+                    )
+                    quiz_data_list = [quiz_data]
+                else:
+                    # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
+                    has_answer = [q for q in unique_questions if q.get("correct_answer")]
+                    unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
+                    
+                    logger.info(
+                        f"Answer sources: {len(has_answer)} từ file "
+                        f"(inline/tô sẵn/bảng đáp án), "
+                        f"{len(unsolved_questions)} cần AI giải"
                     )
 
-                # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
-                has_answer = [q for q in unique_questions if q.get("correct_answer")]
-                unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
-                
-                logger.info(
-                    f"Answer sources: {len(has_answer)} từ file "
-                    f"(inline/tô sẵn/bảng đáp án), "
-                    f"{len(unsolved_questions)} cần AI giải"
-                )
+                    # Chỉ gọi AI cho những câu thực sự thiếu đáp án
+                    ai_solved = 0
+                    if unsolved_questions:
+                        logger.info(f"Calling DeepSeek AI to solve {len(unsolved_questions)} questions...")
+                        solved_results = await self._solve_missing_answers_with_ai(unsolved_questions)
+                        
+                        # Merge solved answers back bằng INDEX (không dùng text matching)
+                        for i, q in enumerate(unsolved_questions):
+                            solved_q = solved_results[i] if i < len(solved_results) else None
+                            if solved_q and solved_q is not None:
+                                answer = solved_q.get("correct_answer", "")
+                                explanation = solved_q.get("explanation", "")
+                                if answer and answer.upper() in {"A", "B", "C", "D"}:
+                                    q["correct_answer"] = answer.upper()
+                                    q["explanation"] = explanation
+                                    ai_solved += 1
+                        
+                        logger.info(f"AI solved {ai_solved}/{len(unsolved_questions)} questions")
 
-                # Chỉ gọi AI cho những câu thực sự thiếu đáp án
-                ai_solved = 0
-                if unsolved_questions:
-                    logger.info(f"Calling DeepSeek AI to solve {len(unsolved_questions)} questions...")
-                    solved_results = await self._solve_missing_answers_with_ai(unsolved_questions)
-                    
-                    # Merge solved answers back bằng INDEX (không dùng text matching)
-                    for i, q in enumerate(unsolved_questions):
-                        solved_q = solved_results[i] if i < len(solved_results) else None
-                        if solved_q and solved_q is not None:
-                            answer = solved_q.get("correct_answer", "")
-                            explanation = solved_q.get("explanation", "")
-                            if answer and answer.upper() in {"A", "B", "C", "D"}:
-                                q["correct_answer"] = answer.upper()
-                                q["explanation"] = explanation
-                                ai_solved += 1
-                    
-                    logger.info(f"AI solved {ai_solved}/{len(unsolved_questions)} questions")
-
-                # Safety fallback: đảm bảo KHÔNG CÓ câu nào thiếu đáp án
-                still_missing = [q for q in unique_questions if not q.get("correct_answer")]
-                if still_missing:
-                    logger.warning(
-                        f"{len(still_missing)} questions still missing answers after AI. "
-                        f"Assigning 'A' as default."
-                    )
-                    for q in still_missing:
-                        q["correct_answer"] = "A"
-                        q["explanation"] = (
-                            "⚠️ Đáp án được gán mặc định (A) vì hệ thống không thể "
-                            "xác định đáp án đúng từ file gốc hoặc AI. "
-                            "Vui lòng kiểm tra lại."
-                        )
-
-                metadata = await self.gemini.extract_metadata(extracted_text[:3000])
-
-                # Tạo title/description tự động
-                desc_parts = [
-                    f"Trích xuất {len(unique_questions)} câu hỏi duy nhất",
-                    f"(lọc từ {len(raw_questions)} câu gốc)",
-                ]
-                if has_answer and not unsolved_questions:
-                    desc_parts.append("• Tất cả đáp án từ file gốc")
-                elif unsolved_questions:
+                    # Safety fallback: đảm bảo KHÔNG CÓ câu nào thiếu đáp án
+                    still_missing = [q for q in unique_questions if not q.get("correct_answer")]
                     if still_missing:
-                        desc_parts.append(
-                            f"• {len(has_answer)} đáp án từ file, "
-                            f"{ai_solved} đáp án từ AI, "
-                            f"{len(still_missing)} đáp án mặc định (cần kiểm tra)"
+                        logger.warning(
+                            f"{len(still_missing)} questions still missing answers after AI. "
+                            f"Assigning 'A' as default."
                         )
-                    else:
-                        desc_parts.append(
-                            f"• {len(has_answer)} đáp án từ file, "
-                            f"{ai_solved} đáp án từ AI"
-                        )
+                        for q in still_missing:
+                            q["correct_answer"] = "A"
+                            q["explanation"] = (
+                                "⚠️ Đáp án được gán mặc định (A) vì hệ thống không thể "
+                                "xác định đáp án đúng từ file gốc hoặc AI. "
+                                "Vui lòng kiểm tra lại."
+                            )
+
+                    metadata = await self.gemini.extract_metadata(extracted_text[:3000])
+
+                    # Tạo title/description tự động
+                    desc_parts = [
+                        f"Trích xuất {len(unique_questions)} câu hỏi duy nhất",
+                        f"(lọc từ {len(raw_questions)} câu gốc)",
+                    ]
+                    if has_answer and not unsolved_questions:
+                        desc_parts.append("• Tất cả đáp án từ file gốc")
+                    elif unsolved_questions:
+                        if still_missing:
+                            desc_parts.append(
+                                f"• {len(has_answer)} đáp án từ file, "
+                                f"{ai_solved} đáp án từ AI, "
+                                f"{len(still_missing)} đáp án mặc định (cần kiểm tra)"
+                            )
+                        else:
+                            desc_parts.append(
+                                f"• {len(has_answer)} đáp án từ file, "
+                                f"{ai_solved} đáp án từ AI"
+                            )
+                        
+                    base_title = metadata.get("title") or f"Trích xuất từ {filename}"
                     
-                base_title = metadata.get("title") or f"Trích xuất từ {filename}"
-                
-                # Split questions by chapter
-                from collections import defaultdict
-                chapter_groups = defaultdict(list)
-                for q in unique_questions:
-                    ch = q.get("chapter", "")
-                    chapter_groups[ch].append(q)
-                
-                quiz_data_list = []
-                for ch, qs in chapter_groups.items():
-                    if not qs:
-                        continue
-                    ch_title = f"{base_title} - {ch}" if ch else base_title
-                    quiz_data_list.append({
-                        "title": ch_title,
-                        "description": " ".join(desc_parts),
-                        "subject": metadata.get("subject"),
-                        "chapter": ch if ch else metadata.get("chapter"),
-                        "exam_type": metadata.get("exam_type"),
-                        "school": metadata.get("school"),
-                        "questions": qs,
-                    })
+                    # Split questions by chapter
+                    from collections import defaultdict
+                    chapter_groups = defaultdict(list)
+                    for q in unique_questions:
+                        ch = q.get("chapter", "")
+                        chapter_groups[ch].append(q)
+                    
+                    quiz_data_list = []
+                    for ch, qs in chapter_groups.items():
+                        if not qs:
+                            continue
+                        ch_title = f"{base_title} - {ch}" if ch else base_title
+                        quiz_data_list.append({
+                            "title": ch_title,
+                            "description": " ".join(desc_parts),
+                            "subject": metadata.get("subject"),
+                            "chapter": ch if ch else metadata.get("chapter"),
+                            "exam_type": metadata.get("exam_type"),
+                            "school": metadata.get("school"),
+                            "questions": qs,
+                        })
             else:
                 # Luôn dùng AI cho generate
                 quiz_data = await self.gemini.generate_quiz(

@@ -1,27 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
-import { LogOut, User as UserIcon, Moon, Sun } from 'lucide-react';
+import { LogOut, User as UserIcon, Moon, Sun, Menu, X, UploadCloud, Sparkles, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { loginWithGoogle } from '../services/api';
 import useAuthStore from '../store/authStore';
 
 const Header = () => {
   const { user, isAuthenticated, login, logout } = useAuthStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <header className="app-header">
       <div className="header-container">
-        <Link to="/" className="logo">
+        <Link to="/" className="logo" onClick={() => setIsMenuOpen(false)}>
           <h1>AIQuiz</h1>
         </Link>
         
-        <nav className="header-nav">
-          <Link to="/upload" className="nav-link">Upload tài liệu</Link>
-          <Link to="/generate" className="nav-link" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            <span style={{ color: "var(--primary-color)", fontWeight: "bold" }}>✨ AI</span> Sinh câu hỏi
+        <button 
+          className="mobile-menu-toggle" 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+        
+        <nav className={`header-nav ${isMenuOpen ? 'open' : ''}`}>
+          <Link to="/upload" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+            <UploadCloud size={18} /> Upload tài liệu
           </Link>
-          <Link to="/history" className="nav-link">Lịch sử</Link>
+          <Link to="/generate" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+            <Sparkles size={18} style={{ color: "var(--color-primary)" }} /> Sinh câu hỏi AI
+          </Link>
+          <Link to="/history" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+            <History size={18} /> Lịch sử
+          </Link>
 
 
           
@@ -50,24 +63,26 @@ const Header = () => {
               </button>
             </div>
           ) : (
-            <GoogleLogin
-              onSuccess={async (credentialResponse) => {
-                try {
-                  const data = await loginWithGoogle(credentialResponse.credential);
-                  login(data.user, data.access_token);
-                  toast.success(`Xin chào, ${data.user.full_name}!`);
-                } catch (error) {
-                  const errorMsg = error.response?.data?.detail || 'Lỗi xác thực từ Server';
-                  toast.error(errorMsg);
-                }
-              }}
-              onError={() => {
-                toast.error('Đăng nhập Google thất bại');
-              }}
-              useOneTap
-              shape="pill"
-              theme="outline"
-            />
+            <div className="auth-wrapper">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  try {
+                    const data = await loginWithGoogle(credentialResponse.credential);
+                    login(data.user, data.access_token);
+                    toast.success(`Xin chào, ${data.user.full_name}!`);
+                  } catch (error) {
+                    const errorMsg = error.response?.data?.detail || 'Lỗi xác thực từ Server';
+                    toast.error(errorMsg);
+                  }
+                }}
+                onError={() => {
+                  toast.error('Đăng nhập Google thất bại');
+                }}
+                useOneTap
+                shape="pill"
+                theme="outline"
+              />
+            </div>
           )}
         </nav>
       </div>
