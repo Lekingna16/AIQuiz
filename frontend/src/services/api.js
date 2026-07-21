@@ -72,9 +72,22 @@ api.interceptors.response.use(
       // Server trả về error (4xx, 5xx)
       const message = error.response.data?.detail || "Đã có lỗi xảy ra";
       console.error(`API Error [${error.response.status}]:`, message);
-    } else if (error.request) {
-      // Request gửi đi nhưng không nhận được response (network error)
+    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      // Timeout error
+      console.error("Timeout Error: Request đã hết thời gian chờ");
+      error.friendlyMessage = "Yêu cầu đã hết thời gian chờ. Tài liệu có thể quá lớn hoặc server đang quá tải. Vui lòng thử lại.";
+    } else if (error.code === 'ERR_CANCELED') {
+      // Request bị hủy (AbortController)
+      console.error("Request cancelled");
+      error.friendlyMessage = "Yêu cầu đã bị hủy.";
+    } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      // Network error - không thể kết nối tới server
       console.error("Network Error: Không thể kết nối tới server");
+      error.friendlyMessage = "Không thể kết nối tới server. Vui lòng kiểm tra kết nối mạng và thử lại.";
+    } else if (error.request) {
+      // Request gửi đi nhưng không nhận được response
+      console.error("No Response Error: Server không phản hồi");
+      error.friendlyMessage = "Server không phản hồi. Vui lòng thử lại sau.";
     }
     return Promise.reject(error);
   }
@@ -90,7 +103,7 @@ api.interceptors.response.use(
  * @param {Object} options - { num_questions, difficulty, language }
  * @returns {Promise} Quiz data
  */
-export const uploadDocument = async (file, options = {}) => {
+export const uploadDocument = async (file, options = {}, onProgress = null) => {
   // Dùng FormData vì gửi file (multipart/form-data)
   const formData = new FormData();
   formData.append("file", file);
@@ -101,7 +114,6 @@ export const uploadDocument = async (file, options = {}) => {
   if (options.difficulty) params.append("difficulty", options.difficulty);
   if (options.language) params.append("language", options.language);
   if (options.mode) params.append("mode", options.mode);
-
   if (options.is_public !== undefined) params.append("is_public", options.is_public);
 
   const response = await api.post(
@@ -109,6 +121,17 @@ export const uploadDocument = async (file, options = {}) => {
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
+      // Timeout riêng cho upload: 10 phút (AI processing có thể rất lâu)
+      timeout: 600000,
+      // Theo dõi tiến trình upload file
+      onUploadProgress: onProgress
+        ? (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / (progressEvent.total || progressEvent.loaded)
+            );
+            onProgress(percentCompleted);
+          }
+        : undefined,
     }
   );
   return response.data;
@@ -184,6 +207,14 @@ export const getAttemptDetails = async (attemptId) => {
  */
 export const loginWithGoogle = async (credential) => {
   const response = await api.post('/api/auth/google', { credential });
+  return response.data;
+};
+
+/**
+ * Mock login for development
+ */
+export const loginMock = async () => {
+  const response = await api.post('/api/auth/mock');
   return response.data;
 };
 

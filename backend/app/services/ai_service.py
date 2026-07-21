@@ -80,7 +80,7 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
 SYSTEM_PROMPT_EXTRACT = """You are an expert data extractor.
 
 ## TASK
-The source material ALREADY contains a list of multiple-choice questions. Your task is to EXTRACT them. 
+The source material ALREADY contains a list of multiple-choice questions. Your task is to EXTRACT exactly {num_questions} questions from it. 
 IMPORTANT: You MUST filter out and REMOVE any DUPLICATE questions (questions that ask the same thing or have identical text).
 
 ## RULES (MUST FOLLOW):
@@ -200,7 +200,10 @@ class DeepSeekService:
         """
         # Build prompt từ template
         if mode == "extract":
-            system_prompt = SYSTEM_PROMPT_EXTRACT.format(language=language)
+            system_prompt = SYSTEM_PROMPT_EXTRACT.format(
+                language=language,
+                num_questions=num_questions
+            )
         else:
             system_prompt = SYSTEM_PROMPT_GENERATE.format(
                 language=language,

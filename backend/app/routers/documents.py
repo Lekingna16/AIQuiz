@@ -154,6 +154,10 @@ async def upload_document(
         default="generate",
         description="Chế độ xử lý: generate (sinh câu mới) hoặc extract (trích xuất và lọc trùng)",
     ),
+    is_public: bool = Query(
+        default=True,
+        description="Cho phép quiz hiển thị công khai",
+    ),
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
@@ -212,7 +216,7 @@ async def upload_document(
             language=language,
             mode=mode,
             user_id=str(current_user.id),
-            is_public=True,
+            is_public=is_public,
         )
 
         return result

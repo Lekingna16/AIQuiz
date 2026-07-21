@@ -37,24 +37,40 @@ const FileUpload = ({ forcedMode }) => {
     multiple: false,
   });
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState(""); // "uploading" | "processing" | ""
+
   const handleUpload = async () => {
     if (!file) return;
     
     setIsUploading(true);
-    toast.info(
-      mode === "extract" 
-        ? "Đang trích xuất và lọc câu hỏi trùng..." 
-        : "Đang xử lý tài liệu và tạo câu hỏi... Quá trình này có thể mất vài phút."
-    );
+    setUploadProgress(0);
+    setUploadPhase("uploading");
     
     try {
-      const result = await uploadDocument(file, {
-        num_questions: numQuestions,
-        difficulty: difficulty,
-        language: language,
-        mode: mode,
-        is_public: isPublic,
-      });
+      const result = await uploadDocument(
+        file, 
+        {
+          num_questions: numQuestions,
+          difficulty: difficulty,
+          language: language,
+          mode: mode,
+          is_public: isPublic,
+        },
+        // Upload progress callback
+        (percent) => {
+          setUploadProgress(percent);
+          if (percent >= 100) {
+            setUploadPhase("processing");
+            toast.info(
+              mode === "extract" 
+                ? "Đã tải file lên. Đang trích xuất và lọc câu hỏi trùng..." 
+                : "Đã tải file lên. Đang xử lý bằng AI... Quá trình này có thể mất vài phút.",
+              { duration: 10000 }
+            );
+          }
+        }
+      );
       
       toast.success("Tạo quiz thành công!");
       // Chuyển hướng tới trang làm quiz
@@ -62,20 +78,63 @@ const FileUpload = ({ forcedMode }) => {
       
     } catch (error) {
       let errorMsg = "Không thể tạo quiz. Vui lòng thử lại.";
-      if (error.response?.data?.detail) {
-        if (Array.isArray(error.response.data.detail)) {
-          // Lỗi validate từ FastAPI (422) trả về mảng các lỗi
-          errorMsg = error.response.data.detail.map(err => err.msg).join(', ');
+
+      if (error.friendlyMessage) {
+        // Lỗi đã được interceptor xử lý với message thân thiện
+        errorMsg = error.friendlyMessage;
+      } else if (error.response) {
+        // Server trả về lỗi HTTP (có response)
+        const status = error.response.status;
+        const detail = error.response.data?.detail;
+
+        if (detail) {
+          if (Array.isArray(detail)) {
+            // Lỗi validate từ FastAPI (422) trả về mảng các lỗi
+            errorMsg = detail.map(err => err.msg).join(', ');
+          } else {
+            // Lỗi HTTP thông thường trả về chuỗi
+            errorMsg = String(detail);
+          }
         } else {
-          // Lỗi HTTP thông thường trả về chuỗi
-          errorMsg = String(error.response.data.detail);
+          // Fallback theo status code
+          switch (status) {
+            case 400:
+              errorMsg = "File không hợp lệ. Vui lòng kiểm tra định dạng và thử lại.";
+              break;
+            case 413:
+              errorMsg = "File quá lớn. Vui lòng chọn file nhỏ hơn 10MB.";
+              break;
+            case 422:
+              errorMsg = "Không thể trích xuất nội dung từ file. Vui lòng thử file khác.";
+              break;
+            case 500:
+              errorMsg = "Lỗi server. Vui lòng thử lại sau ít phút.";
+              break;
+            case 502:
+            case 503:
+            case 504:
+              errorMsg = "Server đang quá tải hoặc bảo trì. Vui lòng thử lại sau.";
+              break;
+            default:
+              errorMsg = `Lỗi từ server (mã ${status}). Vui lòng thử lại.`;
+          }
         }
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMsg = "Yêu cầu đã hết thời gian chờ. Tài liệu có thể quá lớn hoặc server đang quá tải. Vui lòng thử lại.";
+      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMsg = "Không thể kết nối tới server. Vui lòng kiểm tra kết nối mạng và thử lại.";
+      } else if (error.code === 'ERR_CANCELED') {
+        errorMsg = "Yêu cầu đã bị hủy.";
       } else if (error.message) {
-        errorMsg = error.message;
+        // Lỗi khác không xác định
+        errorMsg = `Đã xảy ra lỗi: ${error.message}`;
       }
-      toast.error(errorMsg);
+
+      toast.error(errorMsg, { duration: 8000 });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setUploadPhase("");
     }
   };
 
@@ -180,6 +239,44 @@ const FileUpload = ({ forcedMode }) => {
         )}
       </div>
 
+      {/* Thanh tiến trình upload */}
+      {isUploading && (
+        <div className="upload-progress" style={{ marginTop: "var(--spacing-sm)" }}>
+          <div style={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            marginBottom: "var(--spacing-xs)",
+            fontSize: "0.85rem",
+            color: "var(--text-secondary)"
+          }}>
+            <span>
+              {uploadPhase === "uploading" 
+                ? `Đang tải file lên... ${uploadProgress}%` 
+                : "⏳ AI đang xử lý tài liệu..."}
+            </span>
+            {uploadPhase === "processing" && (
+              <span style={{ color: "var(--primary-color)" }}>Có thể mất vài phút</span>
+            )}
+          </div>
+          <div style={{
+            width: "100%",
+            height: "6px",
+            backgroundColor: "var(--border-color, #e2e8f0)",
+            borderRadius: "3px",
+            overflow: "hidden",
+          }}>
+            <div style={{
+              width: uploadPhase === "processing" ? "100%" : `${uploadProgress}%`,
+              height: "100%",
+              backgroundColor: "var(--primary-color, #4f46e5)",
+              borderRadius: "3px",
+              transition: "width 0.3s ease",
+              animation: uploadPhase === "processing" ? "pulse-progress 1.5s ease-in-out infinite" : "none",
+            }} />
+          </div>
+        </div>
+      )}
+
       {/* Nút Upload */}
       <button 
         className="btn btn-primary upload-btn" 
@@ -189,7 +286,9 @@ const FileUpload = ({ forcedMode }) => {
         {isUploading ? (
           <>
             <Loader2 size={20} className="spinner" />
-            Đang xử lý...
+            {uploadPhase === "uploading" 
+              ? `Đang tải lên... ${uploadProgress}%` 
+              : "AI đang xử lý..."}
           </>
         ) : (
           "Tạo Quiz Ngay"

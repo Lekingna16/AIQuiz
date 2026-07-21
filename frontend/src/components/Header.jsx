@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { LogOut, User as UserIcon, Moon, Sun, Menu, X, UploadCloud, Sparkles, History } from 'lucide-react';
 import { toast } from 'sonner';
-import { loginWithGoogle } from '../services/api';
+import { loginWithGoogle, loginMock } from '../services/api';
 import useAuthStore from '../store/authStore';
 
 const Header = () => {
@@ -63,7 +63,7 @@ const Header = () => {
               </button>
             </div>
           ) : (
-            <div className="auth-wrapper">
+            <div className="auth-wrapper" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <GoogleLogin
                 onSuccess={async (credentialResponse) => {
                   try {
@@ -82,6 +82,22 @@ const Header = () => {
                 shape="pill"
                 theme="outline"
               />
+              <button
+                className="btn btn-secondary"
+                onClick={async () => {
+                  try {
+                    const data = await loginMock();
+                    login(data.user, data.access_token);
+                    toast.success(`Xin chào, ${data.user.full_name}! (Mock User)`);
+                  } catch (error) {
+                    const errorMsg = error.response?.data?.detail || 'Lỗi đăng nhập Mock';
+                    toast.error(errorMsg);
+                  }
+                }}
+                style={{ padding: '6px 12px', fontSize: '14px', borderRadius: '9999px', whiteSpace: 'nowrap' }}
+              >
+                Mock Login
+              </button>
             </div>
           )}
         </nav>

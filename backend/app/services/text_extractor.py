@@ -16,11 +16,39 @@ Edge Cases xử lý:
 - File TXT encoding lạ → chardet auto-detect
 """
 
+import re
 from io import BytesIO
 
 import chardet
 import fitz  # PyMuPDF
 from docx import Document
+
+# TCVN3 to Unicode converter mapping
+TCVN3_CHARS = "µ¸¶·¹¨»¾¼½Æ©ÇÊÈÉË®ÌÐÎÏÑªÒÕÓÔÖ×ÝØÜÞßãáâä«åèæçé¬êíëìîïóñòô\u00adõøö÷ùúýûüþ¡¢§£¤¥¦"
+UNICODE_CHARS = "àáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵĂÂĐÊÔƠƯ"
+TCVN3_EXTRA = "\u03bc\u2212"
+UNICODE_EXTRA = "àu"
+
+tcvn3_to_unicode_map = dict(zip(TCVN3_CHARS + TCVN3_EXTRA, UNICODE_CHARS + UNICODE_EXTRA))
+
+def _is_tcvn3(text: str) -> bool:
+    # Check for characteristic TCVN3 sequences
+    indicators = [
+        r"[Cc]©u",               # C©u / c©u -> Câu / câu
+        r"®\u2212",              # ®− -> đư
+        r"l\u03bc",              # lμ -> là
+        r"t\u2212\u00ebng",      # t−ëng -> tưởng
+        r"tr\u2212\u00eang",     # tr−êng -> trường
+        r"th\u2212\u00ebng",     # th−ëng -> thưởng
+        r"®êi",                  # ®êi -> đời
+        r"®©u",                  # ®©u -> đâu
+    ]
+    pattern = re.compile("|".join(indicators))
+    return bool(pattern.search(text))
+
+def _tcvn3_to_unicode(text: str) -> str:
+    pattern = re.compile("|".join(map(re.escape, tcvn3_to_unicode_map.keys())))
+    return pattern.sub(lambda m: tcvn3_to_unicode_map[m.group(0)], text)
 
 
 class TextExtractor:
