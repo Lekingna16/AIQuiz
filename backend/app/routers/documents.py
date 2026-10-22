@@ -15,6 +15,7 @@ FastAPI APIRouter hoạt động giống "mini FastAPI app":
 
 import logging
 
+from bson import ObjectId
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -23,7 +24,7 @@ from app.database import get_db
 from app.models.document import DocumentResponse
 from app.models.quiz import QuizResponse, Difficulty
 from app.models.user import UserResponse
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_user_optional
 from app.services.ai_service import (
     DeepSeekService,
     DeepSeekServiceError,
@@ -107,6 +108,69 @@ def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:
 # ENDPOINTS
 # ============================================
 
+@router.get(
+    "/me",
+    response_model=dict,
+    summary="List the current user's uploaded documents",
+)
+async def get_my_documents(
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Return upload metadata only; extracted source text is never exposed."""
+    cursor = db.documents.find({"user_id": str(current_user.id)}).sort("created_at", -1)
+    documents = await cursor.to_list(length=None)
+
+    result = []
+    for document in documents:
+        document_id = str(document["_id"])
+        quiz_count = await db.quizzes.count_documents({"document_id": document_id})
+        result.append({
+            "id": document_id,
+            "original_filename": document["original_filename"],
+            "file_type": document["file_type"],
+            "upload_status": document.get("upload_status", "completed"),
+            "quiz_count": quiz_count,
+            "created_at": document["created_at"].isoformat(),
+        })
+    return {"documents": result}
+
+
+@router.delete(
+    "/{document_id}",
+    summary="Delete an uploaded document and every quiz created from it",
+)
+async def delete_document(
+    document_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Delete only the authenticated owner's upload and dependent records."""
+    if not ObjectId.is_valid(document_id):
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+
+    document = await db.documents.find_one({
+        "_id": ObjectId(document_id),
+        "user_id": str(current_user.id),
+    })
+    if not document:
+        raise HTTPException(status_code=404, detail="Uploaded document not found")
+
+    quizzes = await db.quizzes.find({"document_id": document_id}).to_list(length=None)
+    quiz_ids = [str(quiz["_id"]) for quiz in quizzes]
+    question_ids = []
+    if quiz_ids:
+        questions = await db.questions.find({"quiz_id": {"$in": quiz_ids}}).to_list(length=None)
+        question_ids = [str(question["_id"]) for question in questions]
+        await db.questions.delete_many({"quiz_id": {"$in": quiz_ids}})
+        await db.quizzes.delete_many({"_id": {"$in": [ObjectId(quiz_id) for quiz_id in quiz_ids]}})
+        await db.quiz_attempts.delete_many({"quiz_id": {"$in": [ObjectId(quiz_id) for quiz_id in quiz_ids]}})
+    if question_ids:
+        await db.comments.delete_many({"question_id": {"$in": question_ids}})
+
+    await db.documents.delete_one({"_id": ObjectId(document_id)})
+    return {"message": "Uploaded document deleted", "deleted_quizzes": len(quiz_ids)}
+
 @router.post(
     "/upload",
     response_model=dict,
@@ -158,7 +222,7 @@ async def upload_document(
         default=True,
         description="Cho phép quiz hiển thị công khai",
     ),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse | None = Depends(get_current_user_optional),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -215,7 +279,7 @@ async def upload_document(
             difficulty=difficulty.value,
             language=language,
             mode=mode,
-            user_id=str(current_user.id),
+            user_id=str(current_user.id) if current_user else None,
             is_public=is_public,
         )
 
@@ -226,19 +290,22 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=str(e))
 
     except QuizGenerationError as e:
-        # AI response format errors
+        # Keep internal model details out of the user-facing response.
         logger.error(f"Quiz generation error: {e}")
         raise HTTPException(
-            status_code=503,
-            detail=f"AI could not generate valid questions: {str(e)}",
+            status_code=422,
+            detail=(
+                "Không thể tạo đủ số câu như yêu cầu từ tài liệu này. "
+                "Vui lòng giảm số câu hoặc chọn tài liệu có nhiều nội dung hơn."
+            ),
         )
 
     except APIConnectionError as e:
-        # Gemini API connection errors
+        # Keep implementation details out of the user-facing response.
         logger.error(f"DeepSeek API connection error: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"AI service temporarily unavailable: {str(e)}",
+            detail="Dịch vụ tạo bài quiz đang tạm thời không phản hồi. Vui lòng thử lại sau.",
         )
 
     except DeepSeekServiceError as e:
@@ -246,7 +313,7 @@ async def upload_document(
         logger.error(f"DeepSeek service error: {e}")
         raise HTTPException(
             status_code=503,
-            detail="AI service error. Please try again later.",
+            detail="Không thể tạo bài quiz vào lúc này. Vui lòng thử lại sau.",
         )
 
     except Exception as e:

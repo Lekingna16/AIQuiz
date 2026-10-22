@@ -9,13 +9,11 @@ function HomePage() {
   
   // Filters
   const [subject, setSubject] = useState("");
-  const [chapter, setChapter] = useState("");
   const [examType, setExamType] = useState("");
   const [school, setSchool] = useState("");
 
   const [filterOptions, setFilterOptions] = useState({
     subjects: [],
-    chapters: [],
     schools: [],
   });
 
@@ -33,7 +31,6 @@ function HomePage() {
     try {
       const filters = {};
       if (subject) filters.subject = subject;
-      if (chapter) filters.chapter = chapter;
       if (examType) filters.exam_type = examType;
       if (school) filters.school = school;
       
@@ -52,7 +49,7 @@ function HomePage() {
 
   useEffect(() => {
     fetchQuizzes();
-  }, [subject, chapter, examType, school]);
+  }, [subject, examType, school]);
 
   return (
     <div className="home-page">
@@ -97,17 +94,6 @@ function HomePage() {
               ))}
             </select>
             <select 
-              value={chapter} 
-              onChange={e => setChapter(e.target.value)}
-              className="form-input"
-              style={{ flex: 1, minWidth: "150px" }}
-            >
-              <option value="">Tất cả chương/bài</option>
-              {filterOptions.chapters.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <select 
               value={examType} 
               onChange={e => setExamType(e.target.value)}
               className="form-input"
@@ -146,7 +132,6 @@ function HomePage() {
                     {quiz.subject && <span className="badge" style={{ alignSelf: "flex-start", background: "var(--primary-color-light)", color: "var(--primary-color)", padding: "0.2rem 0.6rem", borderRadius: "4px", fontSize: "0.85rem" }}>{quiz.subject}</span>}
                     
                     <div style={{ fontSize: "0.95rem", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                      {quiz.chapter && <div>• Chương: <strong>{quiz.chapter}</strong></div>}
                       {quiz.exam_type && <div>• Kỳ thi: <strong>{quiz.exam_type}</strong></div>}
                       {quiz.school && <div>• Trường: <strong>{quiz.school}</strong></div>}
                     </div>

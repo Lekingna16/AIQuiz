@@ -9,12 +9,12 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Clock, Loader2, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { getMyAttempts } from "../services/api";
+import { getMyAttempts, getMyDocuments, deleteDocument } from "../services/api";
 import useAuthStore from "../store/authStore";
-import axios from "axios";
 
 function HistoryPage() {
   const [quizzes, setQuizzes] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -27,10 +27,14 @@ function HistoryPage() {
     }
     setLoading(true);
     try {
-      const data = await getMyAttempts(pageToFetch, 10);
-      setQuizzes(data.attempts);
-      setTotalPages(data.pages);
-      setPage(data.page);
+      const [attemptData, documentData] = await Promise.all([
+        getMyAttempts(pageToFetch, 10),
+        getMyDocuments(),
+      ]);
+      setQuizzes(attemptData.attempts);
+      setDocuments(documentData.documents);
+      setTotalPages(attemptData.pages);
+      setPage(attemptData.page);
     } catch (error) {
       toast.error("Không thể tải lịch sử. Vui lòng thử lại.");
     } finally {
@@ -43,14 +47,14 @@ function HistoryPage() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa bài quiz này?")) return;
+    if (!window.confirm("Bạn có chắc muốn xóa file upload này và toàn bộ quiz tạo từ file?")) return;
     
     try {
-      await axios.delete(`http://localhost:8000/api/quizzes/${id}`);
-      toast.success("Đã xóa quiz.");
+      await deleteDocument(id);
+      toast.success("Đã xóa file upload và dữ liệu liên quan.");
       fetchHistory(page);
     } catch (error) {
-      toast.error("Không thể xóa quiz.");
+      toast.error("Không thể xóa file upload.");
     }
   };
 
@@ -71,13 +75,34 @@ function HistoryPage() {
         <div className="loading-container">
           <Loader2 size={48} className="spinner" />
         </div>
-      ) : quizzes.length === 0 ? (
+      ) : documents.length === 0 && quizzes.length === 0 ? (
         <div className="placeholder-text card">
-          <p>Bạn chưa làm bài quiz nào.</p>
-          <Link to="/" className="btn btn-primary" style={{ marginTop: '1rem' }}>Khám phá ngay</Link>
+          <p>Bạn chưa có file upload hoặc lịch sử làm bài.</p>
+          <Link to="/upload" className="btn btn-primary" style={{ marginTop: '1rem' }}>Upload tài liệu</Link>
         </div>
       ) : (
         <div className="history-list">
+          <h3 style={{ marginBottom: "var(--spacing-sm)" }}>File đã upload</h3>
+          {documents.length === 0 ? (
+            <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--spacing-lg)" }}>
+              Bạn chưa upload file nào khi đăng nhập.
+            </p>
+          ) : documents.map(document => (
+            <div key={document.id} className="history-card card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-md)" }}>
+              <div className="history-info">
+                <h3 style={{ marginBottom: "var(--spacing-xs)" }}>{document.original_filename}</h3>
+                <div className="history-meta" style={{ display: "flex", gap: "var(--spacing-sm)", color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
+                  <span>{document.quiz_count} bài quiz</span>
+                  <span>• {new Date(document.created_at).toLocaleDateString("vi-VN")}</span>
+                </div>
+              </div>
+              <button type="button" className="btn btn-secondary" onClick={() => handleDelete(document.id)}>
+                <Trash2 size={16} /> Xóa
+              </button>
+            </div>
+          ))}
+
+          <h3 style={{ margin: "var(--spacing-xl) 0 var(--spacing-sm)" }}>Lịch sử làm bài</h3>
           {quizzes.map(quiz => (
             <div key={quiz.id} className="history-card card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--spacing-md)" }}>
               <div className="history-info">

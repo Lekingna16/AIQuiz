@@ -15,6 +15,7 @@ Tại sao dùng Pydantic Settings thay vì os.getenv() thông thường?
 - Single source of truth: tất cả config ở 1 chỗ
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +33,23 @@ class Settings(BaseSettings):
     APP_NAME: str = "AIQuiz"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False  # True trong dev, False trong production
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def normalize_debug_value(cls, value):
+        """Accept common deployment labels without preventing the API from starting.
+
+        Some hosts inject ``DEBUG=release`` or ``DEBUG=production``.  Pydantic
+        only accepts boolean strings by default, so that otherwise harmless
+        environment variable made the whole application fail during import.
+        """
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod"}:
+                return False
+            if normalized in {"development", "dev"}:
+                return True
+        return value
 
     # --- MongoDB ---
     # Connection string tới MongoDB instance

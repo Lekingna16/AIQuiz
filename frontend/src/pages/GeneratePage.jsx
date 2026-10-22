@@ -1,12 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Lock, Wand2 } from "lucide-react";
+import { ArrowLeft, Wand2 } from "lucide-react";
 import FileUpload from "../components/FileUpload";
-import useAuthStore from "../store/authStore";
 
 function GeneratePage() {
-  const { isAuthenticated } = useAuthStore();
-
   return (
     <div className="upload-page" style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem" }}>
       <Link to="/" className="back-link" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", marginBottom: "2rem", textDecoration: "none", color: "var(--text-secondary)" }}>
@@ -24,17 +21,7 @@ function GeneratePage() {
       </div>
 
       <div className="upload-container">
-        {isAuthenticated ? (
-          <FileUpload forcedMode="generate" />
-        ) : (
-          <div className="auth-required-card" style={{ textAlign: "center", padding: "4rem 2rem", background: "var(--card-bg, #ffffff)", borderRadius: "12px", border: "1px solid var(--border-color)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-            <Lock size={48} style={{ color: "var(--text-secondary)", marginBottom: "1.5rem" }} />
-            <h2 style={{ marginBottom: "1rem", color: "var(--text-color)" }}>Yêu cầu đăng nhập</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 2rem auto" }}>
-              Bạn cần đăng nhập để sử dụng tính năng sinh câu hỏi bằng AI.
-            </p>
-          </div>
-        )}
+        <FileUpload forcedMode="generate" />
       </div>
     </div>
   );

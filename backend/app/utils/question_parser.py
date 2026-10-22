@@ -51,12 +51,14 @@ ANSWER_PATTERNS = [
 
 # Pattern: option ở đầu dòng riêng
 SINGLE_OPTION_PATTERN = re.compile(
-    r"^\s*(?:đáp\s*án\s*)?([A-Da-d])\s*[.):\-]\s*(.+?)$",
+    r"^\s*(?:đáp\s*án\s*)?([A-Da-d])\s*[.):\-]\s*(.*)$",
     re.IGNORECASE
 )
 
 # Pattern: đầu câu hỏi - "Câu X:" etc.
 # Dấu chấm/hai chấm/ngoặc là tuỳ chọn. Text đằng sau có thể rỗng (text nằm ở dòng dưới).
+NUMERIC_OPTION_PATTERN = re.compile(r"^\s*([1-4])\s*[.)]\s*(.*)$")
+
 QUESTION_PREFIX_PATTERN = re.compile(
     r"^\s*(?:Câu|CÂU|Question|QUESTION|Q)\s*(\d{1,4})\s*[.:)]?\s*(.*)$",
     re.IGNORECASE,
@@ -65,8 +67,13 @@ QUESTION_PREFIX_PATTERN = re.compile(
 # Pattern: đầu câu hỏi - "X. text" (number + dot/paren + optional text)
 # Rất linh hoạt vì false positives sẽ bị loại nếu không có >= 2 options đi kèm.
 QUESTION_NUM_PATTERN = re.compile(
-    r"^\s*(\d{1,4})\s*[.:)]\s*(.*)$",
+    r"^\s*(\d{1,4}|[lI])\s*[.:)]\s*(.*)$",
 )
+
+# OCR sometimes moves a question number to its own line and misreads ``1``
+# as a lowercase L. Standalone numbers are considered questions only after
+# the preceding question already has options.
+QUESTION_STANDALONE_NUM_PATTERN = re.compile(r"^\s*(\d{1,4})\s*$")
 
 # Pattern bảng đáp án cuối file: "1 | B | 26 | D | 51 | A | 76 | B"
 ANSWER_TABLE_PIPE_PATTERN = re.compile(
@@ -327,11 +334,11 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     current_options = []
     current_answer = ""
     current_option_raw_lines = []  # Lưu raw lines của options để detect marking
-    current_chapter = "Tổng hợp"
+    current_uses_numeric_options = False
 
     def _save_current():
         """Lưu câu hỏi hiện tại nếu hợp lệ."""
-        nonlocal current_q_text, current_options, current_answer, current_q_num, current_option_raw_lines
+        nonlocal current_q_text, current_options, current_answer, current_q_num, current_option_raw_lines, current_uses_numeric_options
         if current_q_text and len(current_options) >= 2:
             cleaned = _clean_question_text(current_q_text)
             if cleaned and len(cleaned) >= 3:
@@ -372,7 +379,6 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                         "options": final_opts[:4],
                         "correct_answer": answer,
                         "explanation": "",
-                        "chapter": current_chapter,
                     })
 
         current_q_text = ""
@@ -380,6 +386,7 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         current_answer = ""
         current_q_num = 0
         current_option_raw_lines = []
+        current_uses_numeric_options = False
 
     for line_idx, line in enumerate(lines):
         stripped = line.strip()
@@ -389,6 +396,31 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         stripped = re.sub(r"^\*{1,2}|\*{1,2}$", "", stripped).strip()
         stripped = re.sub(r"^_{1,2}|_{1,2}$", "", stripped).strip()
         if not stripped:
+            continue
+
+        # A numbered option can look exactly like a question prefix. Treat it
+        # as an option only after a question has started, then map 1-4 to A-D.
+        numeric_option_match = NUMERIC_OPTION_PATTERN.match(stripped)
+        is_first_numeric_option = (
+            numeric_option_match
+            and numeric_option_match.group(1) == "1"
+            and current_q_num > 0
+            and bool(current_q_text)
+            and not current_options
+        )
+        is_following_numeric_option = (
+            numeric_option_match
+            and current_uses_numeric_options
+            and len(current_options) < 4
+        )
+        if is_first_numeric_option or is_following_numeric_option:
+            current_uses_numeric_options = True
+            option_number = int(numeric_option_match.group(1))
+            current_options.append({
+                "key": chr(ord("A") + option_number - 1),
+                "text": numeric_option_match.group(2).strip(),
+            })
+            current_option_raw_lines.append(original_stripped)
             continue
 
         # ---- 1. Check: dòng này là ĐẦU CÂU HỎI MỚI? ----
@@ -406,24 +438,31 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
             # Thử "X. text" (number only)
             q_match = QUESTION_NUM_PATTERN.match(stripped)
             if q_match:
-                num = int(q_match.group(1))
+                raw_num = q_match.group(1)
+                num = 1 if raw_num.lower() == "l" else int(raw_num)
                 remaining = q_match.group(2).strip()
                 if 1 <= num <= 999:
                     q_num = num
                     q_text = remaining
                     is_new_question = True
 
-        # ---- 2. Check Chapter/Bài ----
+            if not is_new_question:
+                standalone_match = QUESTION_STANDALONE_NUM_PATTERN.match(stripped)
+                if standalone_match and current_q_num > 0 and len(current_options) >= 2:
+                    q_num = int(standalone_match.group(1))
+                    q_text = ""
+                    is_new_question = True
+
+        # ---- 2. Skip section headings without classifying questions ----
         if not is_new_question:
             # Nhận diện chương/bài (chứa số, chữ số la mã, hoặc ký tự A-Z)
-            chapter_match = re.match(
+            section_heading_match = re.match(
                 r"^\s*(?:Chương|Bài|Phần)\s+(?:[0-9]+|[IVXLCDM]+|[A-Z])(?:\s*[:.\-]\s*|\s+|$).*$",
                 stripped,
                 re.IGNORECASE
             )
-            if chapter_match and len(stripped) < 150 and not SINGLE_OPTION_PATTERN.match(stripped):
-                _save_current() # Lưu câu hỏi trước đó vào chương cũ trước khi chuyển chương
-                current_chapter = stripped
+            if section_heading_match and len(stripped) < 150 and not SINGLE_OPTION_PATTERN.match(stripped):
+                _save_current()
                 continue
 
         # ---- 3. Check: dòng này là ĐÁP ÁN inline? ----
@@ -488,7 +527,9 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                 else:
                     current_q_text = stripped
             else:
-                current_options[-1]["text"] += " " + stripped
+                current_options[-1]["text"] = (
+                    f"{current_options[-1]['text']} {stripped}".strip()
+                )
                 current_option_raw_lines.append(original_stripped)
 
     # Lưu câu hỏi cuối cùng

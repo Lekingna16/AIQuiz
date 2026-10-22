@@ -46,17 +46,14 @@ async def get_quiz_filters(db: AsyncIOMotorDatabase = Depends(get_db)):
     
     # Lấy các giá trị distinct cho từng trường
     subjects = await db.quizzes.distinct("subject", query)
-    chapters = await db.quizzes.distinct("chapter", query)
     schools = await db.quizzes.distinct("school", query)
     
     # Loại bỏ các giá trị None/rỗng
     subjects = [s for s in subjects if s]
-    chapters = [c for c in chapters if c]
     schools = [s for s in schools if s]
     
     return {
         "subjects": sorted(subjects),
-        "chapters": sorted(chapters),
         "schools": sorted(schools),
     }
 
@@ -70,7 +67,6 @@ async def list_quizzes(
     page: int = Query(default=1, ge=1, description="Trang hiện tại"),
     limit: int = Query(default=10, ge=1, le=50, description="Số quiz/trang"),
     subject: str | None = Query(default=None, description="Lọc theo môn học"),
-    chapter: str | None = Query(default=None, description="Lọc theo chương"),
     exam_type: str | None = Query(default=None, description="Lọc theo loại kỳ thi"),
     school: str | None = Query(default=None, description="Lọc theo trường"),
     db: AsyncIOMotorDatabase = Depends(get_db),
@@ -85,8 +81,6 @@ async def list_quizzes(
     
     if subject:
         query["subject"] = {"$regex": subject, "$options": "i"}
-    if chapter:
-        query["chapter"] = {"$regex": chapter, "$options": "i"}
     if exam_type:
         query["exam_type"] = {"$regex": exam_type, "$options": "i"}
     if school:
@@ -106,7 +100,6 @@ async def list_quizzes(
             "total_questions": q["total_questions"],
             "difficulty": q["difficulty"],
             "subject": q.get("subject"),
-            "chapter": q.get("chapter"),
             "exam_type": q.get("exam_type"),
             "school": q.get("school"),
             "created_at": q["created_at"].isoformat(),
@@ -149,7 +142,6 @@ async def get_my_quizzes(
             "total_questions": q["total_questions"],
             "difficulty": q["difficulty"],
             "subject": q.get("subject"),
-            "chapter": q.get("chapter"),
             "exam_type": q.get("exam_type"),
             "school": q.get("school"),
             "is_public": q.get("is_public", False),
@@ -192,7 +184,6 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
         "total_questions": quiz["total_questions"],
         "difficulty": quiz["difficulty"],
         "subject": quiz.get("subject"),
-        "chapter": quiz.get("chapter"),
         "exam_type": quiz.get("exam_type"),
         "school": quiz.get("school"),
         "created_at": quiz["created_at"].isoformat(),
@@ -402,14 +393,21 @@ async def get_attempt_details(
     summary="Delete a quiz",
     description="Xóa quiz và tất cả câu hỏi liên quan khỏi database.",
 )
-async def delete_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def delete_quiz(
+    quiz_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
     """
     Xóa quiz.
     """
     if not ObjectId.is_valid(quiz_id):
         raise HTTPException(status_code=400, detail="Invalid quiz ID")
         
-    result = await db.quizzes.delete_one({"_id": ObjectId(quiz_id)})
+    result = await db.quizzes.delete_one({
+        "_id": ObjectId(quiz_id),
+        "user_id": str(current_user.id),
+    })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Quiz not found")
         

@@ -8,6 +8,7 @@ Sử dụng mock cho API calls.
 """
 
 import json
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -198,6 +199,49 @@ class TestValidateQuizStructure:
         """Test multiple questions đều hợp lệ."""
         # VALID_QUIZ_JSON has 2 questions
         DeepSeekService._validate_quiz_structure(VALID_QUIZ_JSON)
+
+
+class TestRequestedQuestionCount:
+    @staticmethod
+    def _question(number: int) -> dict:
+        return {
+            "question_text": f"Question {number}?",
+            "options": [
+                {"key": "A", "text": "Option A"},
+                {"key": "B", "text": "Option B"},
+                {"key": "C", "text": "Option C"},
+                {"key": "D", "text": "Option D"},
+            ],
+            "correct_answer": "A",
+            "explanation": "Explanation",
+        }
+
+    @pytest.mark.asyncio
+    async def test_generate_quiz_completes_a_short_response(self):
+        service = object.__new__(DeepSeekService)
+        first_response = {
+            "title": "Quiz",
+            "description": "Description",
+            "questions": [self._question(1), self._question(2)],
+        }
+        follow_up_response = {
+            "title": "Quiz",
+            "description": "Description",
+            "questions": [self._question(3)],
+        }
+        service._call_api_with_retry = AsyncMock(
+            side_effect=[json.dumps(first_response), json.dumps(follow_up_response)]
+        )
+
+        quiz = await service.generate_quiz(
+            text="Source material",
+            num_questions=3,
+            difficulty="mixed",
+            language="en",
+        )
+
+        assert len(quiz["questions"]) == 3
+        assert service._call_api_with_retry.await_count == 2
 
 
 # ============================================

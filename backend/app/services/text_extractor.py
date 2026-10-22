@@ -23,6 +23,21 @@ import chardet
 import fitz  # PyMuPDF
 from docx import Document
 
+
+# Common footer left by document-sharing sites. It is not source material and
+# can otherwise be appended to a question when a PDF page changes mid-question.
+WATERMARK_LINE_PATTERN = re.compile(
+    r"(?:^\s*downloaded\s+by\b|lomoarcpsd\||\bstudocu\b|^\s*scan\s+to\s+open\b)",
+    re.IGNORECASE,
+)
+
+# A number embedded inside a Vietnamese word is a strong signal that the PDF
+# contains a damaged OCR text layer (for example, ``ntr6c`` instead of
+# ``nước``). Ordinary numbering such as ``Câu 10`` does not match.
+OCR_DAMAGE_PATTERN = re.compile(
+    r"(?iu)\b[^\W\d_]+\d+[^\W\d_]+\b|\b(?:ntr6c|nur&c|h6a|h0i|nh6m|strc|lurong)\b"
+)
+
 # TCVN3 to Unicode converter mapping
 TCVN3_CHARS = "µ¸¶·¹¨»¾¼½Æ©ÇÊÈÉË®ÌÐÎÏÑªÒÕÓÔÖ×ÝØÜÞßãáâä«åèæçé¬êíëìîïóñòô\u00adõøö÷ùúýûüþ¡¢§£¤¥¦"
 UNICODE_CHARS = "àáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵĂÂĐÊÔƠƯ"
@@ -69,6 +84,11 @@ class TextExtractor:
 
     # Minimum text length để coi là có nội dung hợp lệ (100 ký tự ≈ 1-2 câu)
     MIN_TEXT_LENGTH = 100
+
+    @staticmethod
+    def has_damaged_ocr_text(text: str) -> bool:
+        """Detect a non-empty PDF text layer that is visibly OCR-corrupted."""
+        return bool(text) and len(OCR_DAMAGE_PATTERN.findall(text)) >= 2
 
     def extract(self, file_bytes: bytes, file_type: str) -> str:
         """
@@ -246,6 +266,8 @@ class TextExtractor:
 
         for line in lines:
             stripped = line.strip()
+            if WATERMARK_LINE_PATTERN.search(stripped):
+                continue
             if not stripped:
                 blank_count += 1
                 if blank_count <= 2:  # Giữ tối đa 2 blank lines liên tiếp

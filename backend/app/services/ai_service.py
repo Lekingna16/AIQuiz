@@ -58,7 +58,6 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
   "title": "A descriptive quiz title based on the document content",
   "description": "A brief 1-2 sentence description of what the quiz covers",
   "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
-  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
   "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
   "school": "Extracted school/university name or null if unknown",
   "questions": [
@@ -80,7 +79,7 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
 SYSTEM_PROMPT_EXTRACT = """You are an expert data extractor.
 
 ## TASK
-The source material ALREADY contains a list of multiple-choice questions. Your task is to EXTRACT exactly {num_questions} questions from it. 
+The source material ALREADY contains a list of multiple-choice questions. Your task is to EXTRACT EVERY valid multiple-choice question from it. Do not stop at an arbitrary number of questions.
 IMPORTANT: You MUST filter out and REMOVE any DUPLICATE questions (questions that ask the same thing or have identical text).
 
 ## RULES (MUST FOLLOW):
@@ -97,7 +96,6 @@ Return ONLY a valid JSON object. No markdown, no code fences, no extra text befo
   "title": "A descriptive quiz title based on the document content",
   "description": "A brief 1-2 sentence description of what the quiz covers",
   "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
-  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
   "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
   "school": "Extracted school/university name or null if unknown",
   "questions": [
@@ -202,7 +200,6 @@ class DeepSeekService:
         if mode == "extract":
             system_prompt = SYSTEM_PROMPT_EXTRACT.format(
                 language=language,
-                num_questions=num_questions
             )
         else:
             system_prompt = SYSTEM_PROMPT_GENERATE.format(
@@ -217,20 +214,75 @@ class DeepSeekService:
         # Parse và validate response
         quiz_data = self._parse_response(response_text)
 
-        # Validate số câu hỏi (chỉ cảnh báo nếu ở chế độ generate)
-        actual_count = len(quiz_data.get("questions", []))
-        if actual_count == 0:
+        questions = quiz_data.get("questions", [])
+        if not questions:
             # Ghi log text ra file để debug
             with open("failed_extracted_text.log", "w", encoding="utf-8") as f:
                 f.write(text)
             raise QuizGenerationError("AI generated 0 questions (Extracted text saved to failed_extracted_text.log)")
 
-        if mode == "generate" and actual_count != num_questions:
-            logger.warning(
-                f"Requested {num_questions} questions, got {actual_count}"
+        if mode == "generate":
+            quiz_data["questions"] = await self._complete_requested_question_count(
+                text=text,
+                system_prompt=system_prompt,
+                questions=questions,
+                requested_count=num_questions,
             )
 
         return quiz_data
+
+    async def _complete_requested_question_count(
+        self,
+        text: str,
+        system_prompt: str,
+        questions: list[dict],
+        requested_count: int,
+    ) -> list[dict]:
+        """Ensure generation returns the exact number of distinct questions."""
+        import string
+
+        def question_key(question: dict) -> str:
+            question_text = question["question_text"].lower().strip()
+            return question_text.translate(str.maketrans("", "", string.punctuation))
+
+        unique_questions = []
+        seen_questions = set()
+
+        def add_unique(candidates: list[dict]) -> None:
+            for candidate in candidates:
+                key = question_key(candidate)
+                if key not in seen_questions:
+                    seen_questions.add(key)
+                    unique_questions.append(candidate)
+
+        add_unique(questions)
+
+        # The model sometimes stops early. Ask for only the remainder, twice,
+        # while naming existing questions so it does not repeat them.
+        for _ in range(2):
+            if len(unique_questions) >= requested_count:
+                break
+
+            remaining_count = requested_count - len(unique_questions)
+            existing_questions = "\n".join(
+                f"- {question['question_text']}" for question in unique_questions
+            )
+            follow_up_prompt = (
+                f"{system_prompt}\n\n"
+                f"This is a continuation. Generate exactly {remaining_count} NEW "
+                "questions only. Do not repeat any of these existing questions:\n"
+                f"{existing_questions}"
+            )
+            response_text = await self._call_api_with_retry(follow_up_prompt, text)
+            additional_quiz = self._parse_response(response_text)
+            add_unique(additional_quiz["questions"])
+
+        if len(unique_questions) < requested_count:
+            raise QuizGenerationError(
+                f"Unable to create the requested {requested_count} distinct questions."
+            )
+
+        return unique_questions[:requested_count]
 
     async def extract_metadata(self, text: str) -> dict:
         """
@@ -244,7 +296,6 @@ Return ONLY a valid JSON object matching this structure:
   "title": "A descriptive title based on the document content",
   "description": "A brief 1-2 sentence description",
   "subject": "Extracted subject name (e.g. Toán, Lịch sử, etc.) or null if unknown",
-  "chapter": "Extracted chapter/topic (e.g. Chương 1, Bài 2) or null if unknown",
   "exam_type": "Extracted exam type (Giữa kì, Cuối kì) or null if unknown",
   "school": "Extracted school/university name or null if unknown"
 }

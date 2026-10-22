@@ -65,7 +65,7 @@ const FileUpload = ({ forcedMode }) => {
             toast.info(
               mode === "extract" 
                 ? "Đã tải file lên. Đang trích xuất và lọc câu hỏi trùng..." 
-                : "Đã tải file lên. Đang xử lý bằng AI... Quá trình này có thể mất vài phút.",
+                : "Đã tải file lên. Đang chuẩn bị bài quiz, quá trình này có thể mất vài phút.",
               { duration: 10000 }
             );
           }
@@ -252,7 +252,7 @@ const FileUpload = ({ forcedMode }) => {
             <span>
               {uploadPhase === "uploading" 
                 ? `Đang tải file lên... ${uploadProgress}%` 
-                : "⏳ AI đang xử lý tài liệu..."}
+                : "⏳ Đang chuẩn bị bài quiz..."}
             </span>
             {uploadPhase === "processing" && (
               <span style={{ color: "var(--primary-color)" }}>Có thể mất vài phút</span>
@@ -288,7 +288,7 @@ const FileUpload = ({ forcedMode }) => {
             <Loader2 size={20} className="spinner" />
             {uploadPhase === "uploading" 
               ? `Đang tải lên... ${uploadProgress}%` 
-              : "AI đang xử lý..."}
+              : "Đang tạo bài quiz..."}
           </>
         ) : (
           "Tạo Quiz Ngay"

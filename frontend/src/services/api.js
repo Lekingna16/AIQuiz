@@ -168,6 +168,17 @@ export const getMyQuizzes = async (page = 1, limit = 10) => {
   return response.data;
 };
 
+/** Lấy các tài liệu mà người dùng đã upload. */
+export const getMyDocuments = async () => {
+  const response = await api.get("/api/documents/me");
+  return response.data;
+};
+
+/** Xóa một file upload cùng các quiz/câu hỏi sinh từ file đó. */
+export const deleteDocument = async (documentId) => {
+  await api.delete(`/api/documents/${documentId}`);
+};
+
 /**
  * Lấy chi tiết quiz để làm bài
  */

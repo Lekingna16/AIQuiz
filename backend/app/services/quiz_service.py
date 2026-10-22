@@ -82,7 +82,6 @@ class QuizService:
         mode: str = "generate",
         user_id: str | None = None,
         subject: str | None = None,
-        chapter: str | None = None,
         exam_type: str | None = None,
         school: str | None = None,
         is_public: bool = False,
@@ -170,6 +169,16 @@ class QuizService:
                 unique_questions = deduplicate_questions(raw_questions)
                 logger.info(f"After dedup: {len(unique_questions)} unique questions")
 
+                # A non-empty but corrupted PDF text layer used to pass the
+                # extractor validation and leak OCR garbage into the quiz.
+                # Keep the parsed order/count, then repair its visible text.
+                requires_ocr_repair = (
+                    file_type.lower() == "pdf"
+                    and self.extractor.has_damaged_ocr_text(extracted_text)
+                )
+                if requires_ocr_repair:
+                    logger.warning("Detected damaged PDF OCR text; repairing questions")
+
                 if not unique_questions:
                     logger.warning("Không tìm thấy câu hỏi bằng Regex. Chuyển sang dùng AI (DeepSeek) để nhận diện format động (Fallback)...")
                     quiz_data = await self.gemini.generate_quiz(
@@ -192,23 +201,37 @@ class QuizService:
                     )
 
                     # Chỉ gọi AI cho những câu thực sự thiếu đáp án
+                    questions_to_process = (
+                        unique_questions if requires_ocr_repair else unsolved_questions
+                    )
                     ai_solved = 0
-                    if unsolved_questions:
-                        logger.info(f"Calling DeepSeek AI to solve {len(unsolved_questions)} questions...")
-                        solved_results = await self._solve_missing_answers_with_ai(unsolved_questions)
+                    if questions_to_process:
+                        logger.info(
+                            f"Calling DeepSeek AI to process {len(questions_to_process)} questions..."
+                        )
+                        solved_results = await self._solve_missing_answers_with_ai(
+                            questions_to_process,
+                            repair_ocr=requires_ocr_repair,
+                        )
                         
                         # Merge solved answers back bằng INDEX (không dùng text matching)
-                        for i, q in enumerate(unsolved_questions):
+                        for i, q in enumerate(questions_to_process):
                             solved_q = solved_results[i] if i < len(solved_results) else None
                             if solved_q and solved_q is not None:
                                 answer = solved_q.get("correct_answer", "")
                                 explanation = solved_q.get("explanation", "")
+                                if requires_ocr_repair:
+                                    repaired_text = solved_q.get("question_text", "").strip()
+                                    repaired_options = solved_q.get("options", [])
+                                    if repaired_text and self._has_complete_options(repaired_options):
+                                        q["question_text"] = repaired_text
+                                        q["options"] = repaired_options
                                 if answer and answer.upper() in {"A", "B", "C", "D"}:
                                     q["correct_answer"] = answer.upper()
                                     q["explanation"] = explanation
                                     ai_solved += 1
                         
-                        logger.info(f"AI solved {ai_solved}/{len(unsolved_questions)} questions")
+                        logger.info(f"AI solved {ai_solved}/{len(questions_to_process)} questions")
 
                     # Safety fallback: đảm bảo KHÔNG CÓ câu nào thiếu đáp án
                     still_missing = [q for q in unique_questions if not q.get("correct_answer")]
@@ -221,7 +244,7 @@ class QuizService:
                             q["correct_answer"] = "A"
                             q["explanation"] = (
                                 "⚠️ Đáp án được gán mặc định (A) vì hệ thống không thể "
-                                "xác định đáp án đúng từ file gốc hoặc AI. "
+                                "xác định đáp án đúng từ file gốc. "
                                 "Vui lòng kiểm tra lại."
                             )
 
@@ -238,38 +261,26 @@ class QuizService:
                         if still_missing:
                             desc_parts.append(
                                 f"• {len(has_answer)} đáp án từ file, "
-                                f"{ai_solved} đáp án từ AI, "
                                 f"{len(still_missing)} đáp án mặc định (cần kiểm tra)"
                             )
                         else:
                             desc_parts.append(
-                                f"• {len(has_answer)} đáp án từ file, "
-                                f"{ai_solved} đáp án từ AI"
+                                f"• {len(has_answer)} đáp án từ file"
                             )
                         
                     base_title = metadata.get("title") or f"Trích xuất từ {filename}"
                     
-                    # Split questions by chapter
-                    from collections import defaultdict
-                    chapter_groups = defaultdict(list)
-                    for q in unique_questions:
-                        ch = q.get("chapter", "")
-                        chapter_groups[ch].append(q)
-                    
-                    quiz_data_list = []
-                    for ch, qs in chapter_groups.items():
-                        if not qs:
-                            continue
-                        ch_title = f"{base_title} - {ch}" if ch else base_title
-                        quiz_data_list.append({
-                            "title": ch_title,
-                            "description": " ".join(desc_parts),
-                            "subject": metadata.get("subject"),
-                            "chapter": ch if ch else metadata.get("chapter"),
-                            "exam_type": metadata.get("exam_type"),
-                            "school": metadata.get("school"),
-                            "questions": qs,
-                        })
+                    # Keep every extracted and de-duplicated question in one
+                    # quiz. Subject metadata is retained, while section
+                    # grouping is intentionally not stored or exposed.
+                    quiz_data_list = [{
+                        "title": base_title,
+                        "description": " ".join(desc_parts),
+                        "subject": metadata.get("subject"),
+                        "exam_type": metadata.get("exam_type"),
+                        "school": metadata.get("school"),
+                        "questions": unique_questions,
+                    }]
             else:
                 # Luôn dùng AI cho generate
                 quiz_data = await self.gemini.generate_quiz(
@@ -293,7 +304,6 @@ class QuizService:
                     language=language,
                     user_id=user_id,
                     subject=q_data.get("subject"),
-                    chapter=q_data.get("chapter"),
                     exam_type=q_data.get("exam_type"),
                     school=q_data.get("school"),
                     is_public=True, # Tự động public và approved
@@ -351,7 +361,21 @@ class QuizService:
         result = await self.db.documents.insert_one(doc)
         return str(result.inserted_id)
 
-    async def _solve_missing_answers_with_ai(self, questions: list[dict]) -> list[dict]:
+    @staticmethod
+    def _has_complete_options(options: list[dict]) -> bool:
+        """Validate a repaired option set before replacing parsed source text."""
+        if not isinstance(options, list) or len(options) != 4:
+            return False
+        keys = {option.get("key") for option in options if isinstance(option, dict)}
+        return keys == {"A", "B", "C", "D"} and all(
+            option.get("text", "").strip() for option in options
+        )
+
+    async def _solve_missing_answers_with_ai(
+        self,
+        questions: list[dict],
+        repair_ocr: bool = False,
+    ) -> list[dict]:
         """
         Gửi các câu hỏi thiếu đáp án lên AI để giải.
         Xử lý song song các batch (30 câu/batch) với Semaphore để tối ưu tốc độ và tránh timeout.
@@ -361,7 +385,9 @@ class QuizService:
         """
         import asyncio
         
-        BATCH_SIZE = 30
+        # Returning corrected text and choices has a larger JSON payload than
+        # answer-only solving, so use smaller batches to avoid truncation.
+        BATCH_SIZE = 10 if repair_ocr else 30
         # Khởi tạo mảng kết quả với cùng kích thước, mặc định rỗng
         all_solved = [None] * len(questions)
         
@@ -386,6 +412,24 @@ class QuizService:
                 })
             json_payload = json.dumps(payload, ensure_ascii=False)
             
+            repair_rules = ""
+            repair_output_fields = ""
+            if repair_ocr:
+                repair_rules = """
+6. The source was read from a damaged Vietnamese OCR layer. Correct obvious OCR
+   character errors in question and option text, without changing its meaning.
+7. Return `question_text` and exactly four non-empty `options` keyed A, B, C,
+   D for every item. Never change the question order or merge questions.
+"""
+                repair_output_fields = '''
+      "question_text": "Corrected question text",
+      "options": [
+        {"key": "A", "text": "..."},
+        {"key": "B", "text": "..."},
+        {"key": "C", "text": "..."},
+        {"key": "D", "text": "..."}
+      ],'''
+
             system_prompt = f"""You are an expert educational AI.
 Your task is to SOLVE a given list of {len(batch)} multiple-choice questions.
 
@@ -399,6 +443,7 @@ For EACH question, you MUST determine the correct answer based on your knowledge
 3. Determine the correct answer (must be one of: A, B, C, D).
 4. Provide a brief explanation for why it is correct.
 5. Return answers IN THE SAME ORDER as the input.
+{repair_rules}
 
 ## OUTPUT FORMAT
 Return ONLY a valid JSON object matching this structure:
@@ -406,6 +451,7 @@ Return ONLY a valid JSON object matching this structure:
   "questions": [
     {{
       "index": 1,
+{repair_output_fields}
       "correct_answer": "A",
       "explanation": "..."
     }}
@@ -462,7 +508,6 @@ Return ONLY a valid JSON object matching this structure:
         language: str,
         user_id: str | None,
         subject: str | None,
-        chapter: str | None,
         exam_type: str | None,
         school: str | None,
         is_public: bool,
@@ -482,7 +527,6 @@ Return ONLY a valid JSON object matching this structure:
             "difficulty": difficulty,
             "language": language,
             "subject": subject,
-            "chapter": chapter,
             "exam_type": exam_type,
             "school": school,
             "is_public": is_public,

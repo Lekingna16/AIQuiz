@@ -252,6 +252,31 @@ class TestEdgeCases:
         assert "\x00" not in cleaned
         assert "HelloWorldTest" in cleaned.replace(" ", "")
 
+    def test_clean_text_removes_document_sharing_watermarks(self, extractor):
+        text = (
+            "Question text\n"
+            "Downloaded by someone@example.com\n"
+            "lOMoARcPSD|34871021\n"
+            "Scan to open on Studocu\n"
+            "Studocu is not sponsored or endorsed by any college\n"
+            "Answer text"
+        )
+
+        cleaned = extractor._clean_text(text)
+
+        assert "Downloaded by" not in cleaned
+        assert "lOMoARcPSD" not in cleaned
+        assert "Studocu" not in cleaned
+        assert cleaned == "Question text\nAnswer text"
+
+    def test_detects_damaged_ocr_text(self, extractor):
+        assert extractor.has_damaged_ocr_text(
+            "Nhà ntr6c có sự phân h6a giai cấp trong xa h0i."
+        )
+        assert not extractor.has_damaged_ocr_text(
+            "Câu 10: Nhà nước có sự phân hóa giai cấp trong xã hội."
+        )
+
     def test_clean_text_normalizes_newlines(self, extractor):
         """Test cleaning normalizes different newline styles."""
         text = "Line 1\r\nLine 2\rLine 3\nLine 4"
