@@ -14,8 +14,6 @@ Pattern sử dụng: Singleton Connection
 - Tất cả requests dùng chung connection pool
 """
 
-import ssl
-
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import get_settings
@@ -58,17 +56,6 @@ class Database:
             tlsCAFile=certifi.where() if is_atlas else None,
             tls=is_atlas
         )
-
-        # Atlas supports TLS 1.2 and 1.3.  Some managed-host OpenSSL builds
-        # negotiate TLS 1.3 unreliably with Atlas, returning a generic
-        # ``TLSV1_ALERT_INTERNAL_ERROR`` before authentication.  Pinning Atlas
-        # traffic to TLS 1.2 keeps encryption and certificate validation fully
-        # enabled while using the broadly compatible protocol version.
-        if is_atlas:
-            ssl_context = cls.client.delegate.options.pool_options._ssl_context
-            if ssl_context is not None:
-                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-                ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
 
         # Lấy reference tới database cụ thể
         # MongoDB tự tạo database nếu chưa tồn tại (lazy creation)
