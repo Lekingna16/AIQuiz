@@ -612,7 +612,7 @@ class TextExtractor:
 
     @classmethod
     def render_scanned_pdf_pages(cls, file_bytes: bytes) -> list[bytes]:
-        """Render a scan-only PDF to compact JPEG pages for multimodal OCR."""
+        """Render PDF scan chất lượng cao cho Vision OCR tiếng Việt."""
         try:
             doc = fitz.open(stream=file_bytes, filetype="pdf")
             try:
@@ -624,7 +624,11 @@ class TextExtractor:
 
                 pages = []
                 for page in doc:
-                    pages.append(_render_rect_jpeg(page, page.rect))
+                    # Vision OCR cần nét hơn local OCR: giữ cạnh dài tối đa 3600px
+                    # để dấu tiếng Việt, chữ cái D và công thức nhỏ không bị mất.
+                    pages.append(_render_rect_jpeg(
+                        page, page.rect, preferred_dpi=300, max_render_side=3600
+                    ))
                 return pages
             finally:
                 doc.close()
@@ -1143,12 +1147,14 @@ def _render_rect_jpeg(
     page: fitz.Page,
     rect: fitz.Rect,
     preferred_dpi: int = 200,
+    max_render_side: int = 3000,
 ) -> bytes:
     """Render trang hoặc vùng ảnh trên trang PDF sang JPEG gọn nhẹ cho Vision OCR."""
-    dpi = LocalOCREngine.adaptive_dpi(rect, preferred_dpi=preferred_dpi, min_side_px=1000)
-    dpi = min(dpi, 300)
+    longest_pt = max(float(rect.width), float(rect.height), 1.0)
+    dpi_cap = max(72, int(max_render_side * 72.0 / longest_pt))
+    dpi = min(max(72, int(preferred_dpi)), dpi_cap)
     pixmap = page.get_pixmap(dpi=dpi, clip=rect, alpha=False)
-    return pixmap.tobytes("jpeg")
+    return pixmap.tobytes("jpeg", jpg_quality=95)
 
 
 def _collect_pdf_markup_rects(page: fitz.Page) -> tuple[list[fitz.Rect], list[fitz.Rect]]:

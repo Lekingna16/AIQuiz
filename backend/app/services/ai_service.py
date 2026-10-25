@@ -344,29 +344,29 @@ Return ONLY a valid JSON object matching this structure:
             raise QuizGenerationError("The scanned PDF has no pages to read.")
 
         instruction = (
-            "You are an OCR engine for Vietnamese educational material. "
-            "Transcribe every visible word exactly, preserving question numbers, "
-            "answer choices A, B, C, D, formulas, and line breaks. Never omit a "
-            "partially visible answer choice. Keep pages separate by writing a line "
-            "in the exact form === PAGE N === before each page. Do not summarize, "
-            "solve, translate, correct, or add commentary. Return plain text only."
+            "You are a high-accuracy OCR engine. The image is a Vietnamese medical "
+            "exam page. Copy the visible text verbatim in Unicode Vietnamese. Preserve "
+            "every Vietnamese diacritic, capital letter, punctuation mark, question "
+            "number, formula, and line break. Do not translate, summarize, explain, "
+            "correct wording, or guess missing words. Every answer option must be on "
+            "its own line and start exactly with A., B., C., or D. Never omit an "
+            "option: when a character is genuinely unreadable, write [không rõ] in "
+            "its place rather than deleting the line. Return plain text only."
         )
         page_texts = []
 
-        # Batching a few pages keeps requests well below the provider payload
-        # limit while avoiding one network call per page.
-        for offset in range(0, len(page_images), 3):
-            batch = page_images[offset:offset + 3]
+        # One image per request prevents columns and option lines from one page
+        # being merged into the next page by a vision model.
+        for offset, image in enumerate(page_images):
             content = [{
                 "type": "text",
-                "text": f"{instruction}\nPages {offset + 1}-{offset + len(batch)}:",
+                "text": f"{instruction}\nThis is page {offset + 1}. Start with === PAGE {offset + 1} ===.",
             }]
-            for image in batch:
-                encoded_image = base64.b64encode(image).decode("ascii")
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
-                })
+            encoded_image = base64.b64encode(image).decode("ascii")
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
+            })
 
             page_texts.append(await self._call_vision_ocr(content))
 
