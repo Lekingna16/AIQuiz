@@ -77,6 +77,7 @@ class Database:
             await cls.db.quizzes.create_index([
                 ("is_public", 1), ("is_approved", 1), ("exam_type", 1), ("created_at", -1),
             ])
+            await cls.db.upload_jobs.create_index([("created_at", -1)])
             print(f"[OK] Connected to MongoDB: {settings.MONGODB_DB_NAME}")
         except Exception as e:
             print(f"[ERROR] MongoDB connection failed: {e}")

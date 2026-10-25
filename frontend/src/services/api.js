@@ -23,7 +23,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "https://aiquiz-hla0.onrend
 const api = axios.create({
   baseURL: API_BASE_URL,
   // Normal API calls should fail quickly instead of leaving the UI blocked.
-  // Uploads override this with their own 10-minute timeout below.
+  // Uploads return a job id quickly, then the UI polls its status.
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",
@@ -106,7 +106,7 @@ api.interceptors.response.use(
  * Upload file và sinh quiz
  * @param {File} file - File PDF/DOCX/TXT
  * @param {Object} options - { num_questions, difficulty, language, major, subject, exam_type, school }
- * @returns {Promise} Quiz data
+ * @returns {Promise<{job_id: string, status: string}>} queued upload job
  */
 export const uploadDocument = async (file, options = {}, onProgress = null) => {
   // Dùng FormData vì gửi file (multipart/form-data)
@@ -130,8 +130,9 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
-      // Stop waiting before the hosting proxy drops a stalled AI request.
-      timeout: 120000,
+      // This request only transfers the file and queues work; it should not
+      // stay open while OCR or AI generation runs.
+      timeout: 60000,
       // Theo dõi tiến trình upload file
       onUploadProgress: onProgress
         ? (progressEvent) => {
@@ -144,6 +145,33 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
     }
   );
   return response.data;
+};
+
+export const getUploadJob = async (jobId) => {
+  const response = await api.get(`/api/documents/jobs/${jobId}`);
+  return response.data;
+};
+
+export const waitForUploadJob = async (jobId, onStatus) => {
+  const deadline = Date.now() + (15 * 60 * 1000);
+
+  while (Date.now() < deadline) {
+    const job = await getUploadJob(jobId);
+    onStatus?.(job.status);
+
+    if (job.status === "completed") return job;
+    if (job.status === "failed") {
+      const error = new Error(job.error || "Không thể xử lý tài liệu.");
+      error.friendlyMessage = job.error;
+      throw error;
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+  }
+
+  const error = new Error("Tài liệu vẫn đang được xử lý.");
+  error.friendlyMessage = "Tài liệu đang được xử lý lâu hơn dự kiến. Vui lòng mở lại Lịch sử sau ít phút.";
+  throw error;
 };
 
 /**

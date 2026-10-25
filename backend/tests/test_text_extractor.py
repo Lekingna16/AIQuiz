@@ -184,6 +184,12 @@ class TestPdfExtraction:
         # Text should be reasonably clean
         assert "\x00" not in result  # No null bytes
 
+    def test_render_scanned_pdf_pages_for_vision_ocr(self, extractor, sample_pdf_bytes):
+        pages = extractor.render_scanned_pdf_pages(sample_pdf_bytes)
+
+        assert len(pages) == 1
+        assert pages[0].startswith(b"\xff\xd8")
+
 
 # ============================================
 # VALIDATION TESTS

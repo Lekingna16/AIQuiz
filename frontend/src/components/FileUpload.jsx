@@ -3,7 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { Upload, File, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { getQuizFilters, uploadDocument } from "../services/api";
+import { getQuizFilters, uploadDocument, waitForUploadJob } from "../services/api";
 
 const normalizeForSearch = (value) => value
   .normalize("NFD")
@@ -169,7 +169,7 @@ const FileUpload = ({ forcedMode }) => {
     setUploadPhase("uploading");
     
     try {
-      const result = await uploadDocument(
+      const job = await uploadDocument(
         file, 
         {
           num_questions: numQuestions,
@@ -196,9 +196,14 @@ const FileUpload = ({ forcedMode }) => {
         }
       );
       
+      setUploadPhase("processing");
+      const result = await waitForUploadJob(job.job_id, (status) => {
+        if (status === "queued") setUploadPhase("processing");
+      });
+
       toast.success("Tạo quiz thành công!");
       // Chuyển hướng tới trang làm quiz
-      navigate(`/quiz/${result.quiz.id}`);
+      navigate(`/quiz/${result.quiz_id}`);
       
     } catch (error) {
       let errorMsg = "Không thể tạo quiz. Vui lòng thử lại.";

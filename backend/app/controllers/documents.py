@@ -15,9 +15,10 @@ FastAPI APIRouter hoạt động giống "mini FastAPI app":
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from bson import ObjectId
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Query, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
@@ -71,18 +72,10 @@ _generation_semaphore = asyncio.Semaphore(1)
 
 
 async def _generate_in_available_slot(quiz_service: QuizService, **kwargs):
-    try:
-        await asyncio.wait_for(_generation_semaphore.acquire(), timeout=0.1)
-    except asyncio.TimeoutError as exc:
-        raise HTTPException(
-            status_code=429,
-            detail="Máy chủ đang xử lý một tài liệu khác. Vui lòng thử lại sau ít phút.",
-        ) from exc
-
-    try:
+    # Jobs wait in memory instead of making the browser retry while a single
+    # small instance is already generating another quiz.
+    async with _generation_semaphore:
         return await quiz_service.upload_and_generate_quiz(**kwargs)
-    finally:
-        _generation_semaphore.release()
 
 
 # ============================================
@@ -138,6 +131,61 @@ def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:
         )
 
     return ext
+
+
+async def _process_upload_job(
+    *,
+    db: AsyncIOMotorDatabase,
+    job_id: ObjectId,
+    file_bytes: bytes,
+    filename: str,
+    file_type: str,
+    options: dict,
+) -> None:
+    """Run the expensive extraction and AI generation after the upload responds."""
+    await db.upload_jobs.update_one(
+        {"_id": job_id},
+        {"$set": {"status": "processing", "started_at": datetime.now(timezone.utc)}},
+    )
+
+    try:
+        settings = get_settings()
+        quiz_service = QuizService(db=db, gemini_service=_create_ai_service(settings))
+        result = await _generate_in_available_slot(
+            quiz_service,
+            file_bytes=file_bytes,
+            filename=filename,
+            file_type=file_type,
+            **options,
+        )
+        await db.upload_jobs.update_one(
+            {"_id": job_id},
+            {"$set": {
+                "status": "completed",
+                "quiz_id": result["quiz"]["id"],
+                "document_id": result["document_id"],
+                "completed_at": datetime.now(timezone.utc),
+            }},
+        )
+        return
+    except ValueError as exc:
+        logger.info("Upload job %s rejected: %s", job_id, exc)
+        error = str(exc)
+    except (QuizGenerationError, APIConnectionError, DeepSeekServiceError) as exc:
+        logger.error("Upload job %s failed in AI service: %s", job_id, exc)
+        error = "Dịch vụ AI tạm thời không phản hồi. Vui lòng thử lại sau."
+    except Exception:
+        logger.exception("Unexpected failure in upload job %s", job_id)
+        error = "Không thể xử lý tài liệu lúc này. Vui lòng thử lại sau."
+
+    await db.upload_jobs.update_one(
+        {"_id": job_id},
+        {"$set": {
+            "status": "failed",
+            "error": error,
+            "completed_at": datetime.now(timezone.utc),
+        }},
+    )
 
 
 # ============================================
@@ -203,11 +251,35 @@ async def delete_document(
     await db.documents.delete_one({"_id": ObjectId(document_id)})
     return {"message": "Uploaded document deleted", "deleted_quizzes": len(quiz_ids)}
 
+
+@router.get("/jobs/{job_id}", summary="Get asynchronous upload job status")
+async def get_upload_job(
+    job_id: str,
+    current_user: UserResponse | None = Depends(get_current_user_optional),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    if not ObjectId.is_valid(job_id):
+        raise HTTPException(status_code=404, detail="Upload job not found")
+
+    job = await db.upload_jobs.find_one({"_id": ObjectId(job_id)})
+    if not job or (
+        job.get("user_id")
+        and (not current_user or job["user_id"] != str(current_user.id))
+    ):
+        raise HTTPException(status_code=404, detail="Upload job not found")
+
+    return {
+        "job_id": str(job["_id"]),
+        "status": job["status"],
+        "quiz_id": job.get("quiz_id"),
+        "error": job.get("error"),
+    }
+
 @router.post(
     "/upload",
     response_model=dict,
-    status_code=200,
-    summary="Upload document & generate quiz",
+    status_code=202,
+    summary="Upload document and queue quiz generation",
     description="""
     Upload file PDF/DOCX/TXT → Extract text → Gemini AI sinh câu hỏi.
     
@@ -228,6 +300,7 @@ async def delete_document(
     },
 )
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(
         ...,
         description="File tài liệu (PDF, DOCX, TXT). Max 50MB.",
@@ -311,68 +384,34 @@ async def upload_document(
         )
 
     # =====================
-    # Step 3: Initialize services & run pipeline
-    # =====================
-    try:
-        ai_service = _create_ai_service(settings)
-        quiz_service = QuizService(db=db, gemini_service=ai_service)
+    # Queue expensive OCR and AI generation after responding to the browser.
+    job = {
+        "status": "queued",
+        "user_id": str(current_user.id) if current_user else None,
+        "original_filename": file.filename,
+        "created_at": datetime.now(timezone.utc),
+    }
+    insert_result = await db.upload_jobs.insert_one(job)
+    job_id = insert_result.inserted_id
 
-        result = await _generate_in_available_slot(
-            quiz_service,
-            file_bytes=file_bytes,
-            filename=file.filename,
-            file_type=file_ext,
-            num_questions=num_questions,
-            difficulty=difficulty.value,
-            language=language,
-            mode=mode,
-            user_id=str(current_user.id) if current_user else None,
-            is_public=is_public,
-            subject=subject,
-            major=major,
-            exam_type=exam_type,
-            school=school,
-        )
-
-        return result
-
-    except HTTPException:
-        raise
-
-    except ValueError as e:
-        # Text extraction / validation errors
-        raise HTTPException(status_code=422, detail=str(e))
-
-    except QuizGenerationError as e:
-        # Keep internal model details out of the user-facing response.
-        logger.error(f"Quiz generation error: {e}")
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Không thể tạo đủ số câu như yêu cầu từ tài liệu này. "
-                "Vui lòng giảm số câu hoặc chọn tài liệu có nhiều nội dung hơn."
-            ),
-        )
-
-    except APIConnectionError as e:
-        # Keep implementation details out of the user-facing response.
-        logger.error(f"DeepSeek API connection error: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail="Dịch vụ tạo bài quiz đang tạm thời không phản hồi. Vui lòng thử lại sau.",
-        )
-
-    except DeepSeekServiceError as e:
-        # Generic DeepSeek errors
-        logger.error(f"DeepSeek service error: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail="Không thể tạo bài quiz vào lúc này. Vui lòng thử lại sau.",
-        )
-
-    except Exception as e:
-        logger.exception(f"Unexpected error in upload: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="An unexpected error occurred. Please try again.",
-        )
+    background_tasks.add_task(
+        _process_upload_job,
+        db=db,
+        job_id=job_id,
+        file_bytes=file_bytes,
+        filename=file.filename,
+        file_type=file_ext,
+        options={
+            "num_questions": num_questions,
+            "difficulty": difficulty.value,
+            "language": language,
+            "mode": mode,
+            "user_id": str(current_user.id) if current_user else None,
+            "is_public": is_public,
+            "subject": subject,
+            "major": major,
+            "exam_type": exam_type,
+            "school": school,
+        },
+    )
+    return {"job_id": str(job_id), "status": "queued"}

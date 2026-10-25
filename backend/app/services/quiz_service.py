@@ -115,6 +115,11 @@ class QuizService:
             logger.info(f"Extracting text from: {filename} ({file_type})")
             extracted_text = self.extractor.extract(file_bytes, file_type)
 
+            if not extracted_text.strip() and file_type.lower() == "pdf":
+                logger.info("PDF has no text layer; using Gemini vision OCR")
+                page_images = self.extractor.render_scanned_pdf_pages(file_bytes)
+                extracted_text = await self.gemini.transcribe_scanned_pdf(page_images)
+
             # Validate text content
             is_valid, error_msg = self.extractor.validate_extracted_text(extracted_text)
             if not is_valid:

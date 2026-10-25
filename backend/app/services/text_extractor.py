@@ -84,6 +84,8 @@ class TextExtractor:
 
     # Minimum text length để coi là có nội dung hợp lệ (100 ký tự ≈ 1-2 câu)
     MIN_TEXT_LENGTH = 100
+    SCANNED_PDF_MAX_PAGES = 20
+    SCANNED_PDF_DPI_SCALE = 2
 
     @staticmethod
     def has_damaged_ocr_text(text: str) -> bool:
@@ -145,6 +147,36 @@ class TextExtractor:
             )
 
         return True, ""
+
+    @classmethod
+    def render_scanned_pdf_pages(cls, file_bytes: bytes) -> list[bytes]:
+        """Render a scan-only PDF to compact JPEG pages for multimodal OCR.
+
+        The actual recognition is delegated to the configured Gemini model. This
+        avoids requiring a platform-specific OCR binary in development and on
+        Render, while keeping the rendered payload bounded for a small server.
+        """
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            try:
+                if doc.page_count > cls.SCANNED_PDF_MAX_PAGES:
+                    raise ValueError(
+                        "Scanned PDFs can contain at most "
+                        f"{cls.SCANNED_PDF_MAX_PAGES} pages."
+                    )
+
+                matrix = fitz.Matrix(cls.SCANNED_PDF_DPI_SCALE, cls.SCANNED_PDF_DPI_SCALE)
+                pages = []
+                for page in doc:
+                    pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+                    pages.append(pixmap.tobytes("jpeg"))
+                return pages
+            finally:
+                doc.close()
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise ValueError("Unable to prepare the scanned PDF for OCR.") from exc
 
     # ============================================
     # Private extraction methods

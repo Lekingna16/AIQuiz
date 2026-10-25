@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import UploadFile
+from fastapi import BackgroundTasks, UploadFile
 
 from app.models.quiz import Difficulty
 from app.controllers import documents, quizzes
@@ -24,21 +24,20 @@ async def test_upload_catalog_returns_major_specific_course_suggestions():
 
 @pytest.mark.asyncio
 async def test_guest_upload_accepts_a_custom_major(monkeypatch):
-    service = MagicMock()
-    service.upload_and_generate_quiz = AsyncMock(
-        return_value={"document_id": "document-id", "quiz": {"id": "quiz-id"}}
-    )
     settings = SimpleNamespace(
         DEEPSEEK_API_KEY="test-key",
         MAX_FILE_SIZE_BYTES=1024 * 1024,
     )
 
     monkeypatch.setattr(documents, "get_settings", lambda: settings)
-    monkeypatch.setattr(documents, "DeepSeekService", lambda **_: MagicMock())
-    monkeypatch.setattr(documents, "QuizService", lambda **_: service)
+    db = MagicMock()
+    db.upload_jobs.insert_one = AsyncMock(
+        return_value=SimpleNamespace(inserted_id="64b64b64b64b64b64b64b64b")
+    )
 
     upload = UploadFile(filename="guest.txt", file=BytesIO(b"guest document"))
     result = await documents.upload_document(
+        background_tasks=BackgroundTasks(),
         file=upload,
         num_questions=5,
         difficulty=Difficulty.MIXED,
@@ -49,12 +48,38 @@ async def test_guest_upload_accepts_a_custom_major(monkeypatch):
         major="Ngành liên ngành mới",
         exam_type="Cuối kỳ",
         current_user=None,
-        db=MagicMock(),
+        db=db,
     )
 
-    assert result["quiz"]["id"] == "quiz-id"
-    assert service.upload_and_generate_quiz.await_args.kwargs["user_id"] is None
-    assert service.upload_and_generate_quiz.await_args.kwargs["subject"] == "Y học hàng không"
-    assert service.upload_and_generate_quiz.await_args.kwargs["major"] == "Ngành liên ngành mới"
-    assert service.upload_and_generate_quiz.await_args.kwargs["exam_type"] == "Cuối kỳ"
-    assert service.upload_and_generate_quiz.await_args.kwargs["school"] is None
+    assert result == {"job_id": "64b64b64b64b64b64b64b64b", "status": "queued"}
+    db.upload_jobs.insert_one.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_background_upload_job_marks_quiz_as_completed(monkeypatch):
+    db = MagicMock()
+    db.upload_jobs.update_one = AsyncMock()
+    service = MagicMock()
+
+    monkeypatch.setattr(documents, "get_settings", lambda: SimpleNamespace())
+    monkeypatch.setattr(documents, "_create_ai_service", lambda _: MagicMock())
+    monkeypatch.setattr(documents, "QuizService", lambda **_: service)
+    monkeypatch.setattr(
+        documents,
+        "_generate_in_available_slot",
+        AsyncMock(return_value={"document_id": "document-id", "quiz": {"id": "quiz-id"}}),
+    )
+
+    await documents._process_upload_job(
+        db=db,
+        job_id=documents.ObjectId("64b64b64b64b64b64b64b64b"),
+        file_bytes=b"test document",
+        filename="test.txt",
+        file_type="txt",
+        options={},
+    )
+
+    updates = [call.args[1]["$set"] for call in db.upload_jobs.update_one.await_args_list]
+    assert updates[0]["status"] == "processing"
+    assert updates[-1]["status"] == "completed"
+    assert updates[-1]["quiz_id"] == "quiz-id"

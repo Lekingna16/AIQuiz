@@ -22,6 +22,7 @@ Model choice: deepseek-chat
 """
 
 import asyncio
+import base64
 import json
 import logging
 import re
@@ -314,6 +315,72 @@ Return ONLY a valid JSON object matching this structure:
             return json.loads(cleaned)
         except json.JSONDecodeError:
             return {}
+
+    async def transcribe_scanned_pdf(self, page_images: list[bytes]) -> str:
+        """Use Gemini vision to read a scan-only PDF rendered as page images."""
+        if self.provider_name != "Gemini":
+            raise QuizGenerationError(
+                "Scan-only PDFs require Gemini to be configured as the AI provider."
+            )
+        if not page_images:
+            raise QuizGenerationError("The scanned PDF has no pages to read.")
+
+        instruction = (
+            "You are an OCR engine for Vietnamese educational material. "
+            "Transcribe every visible word exactly, preserving question numbers, "
+            "answer choices, formulas, and line breaks. Do not summarize, solve, "
+            "translate, or add commentary. Return plain text only."
+        )
+        page_texts = []
+
+        # Batching a few pages keeps requests well below the provider payload
+        # limit while avoiding one network call per page.
+        for offset in range(0, len(page_images), 3):
+            batch = page_images[offset:offset + 3]
+            content = [{
+                "type": "text",
+                "text": f"{instruction}\nPages {offset + 1}-{offset + len(batch)}:",
+            }]
+            for image in batch:
+                encoded_image = base64.b64encode(image).decode("ascii")
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
+                })
+
+            page_texts.append(await self._call_vision_ocr(content))
+
+        return "\n\n".join(text for text in page_texts if text.strip()).strip()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=15),
+        retry=retry_if_exception_type(APIConnectionError),
+        reraise=True,
+    )
+    async def _call_vision_ocr(self, content: list[dict]) -> str:
+        """Call Gemini vision without JSON mode; OCR must remain plain text."""
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.chat.completions.create,
+                    model=self.model,
+                    messages=[{"role": "user", "content": content}],
+                    temperature=0,
+                    max_tokens=8192,
+                ),
+                timeout=90,
+            )
+            text = response.choices[0].message.content
+            if not text:
+                raise QuizGenerationError("Gemini returned no text for the scanned PDF.")
+            return text
+        except asyncio.TimeoutError as exc:
+            raise APIConnectionError("Gemini OCR timed out after 90 seconds.") from exc
+        except (QuizGenerationError, APIConnectionError):
+            raise
+        except Exception as exc:
+            raise APIConnectionError(f"Gemini OCR error: {str(exc)}") from exc
 
     @retry(
         stop=stop_after_attempt(3),
