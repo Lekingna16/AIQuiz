@@ -97,11 +97,9 @@ async def test_upload_metadata_overrides_ai_metadata():
 
 
 @pytest.mark.asyncio
-async def test_quiz_service_resolves_pending_ocr_segments_with_gemini_fallback():
+async def test_quiz_service_never_sends_pending_ocr_segments_to_ai():
     gemini_mock = MagicMock()
-    gemini_mock.transcribe_images = AsyncMock(
-        return_value=["Câu 2: Nội dung đọc từ ảnh scan bằng Gemini Vision?\nA. 1\nB. 2\nC. 3\nD. 4"]
-    )
+    gemini_mock.transcribe_images = AsyncMock()
     service = QuizService(db=MagicMock(), gemini_service=gemini_mock)
 
     extraction = ExtractionResult(
@@ -114,9 +112,9 @@ async def test_quiz_service_resolves_pending_ocr_segments_with_gemini_fallback()
     service.extractor.extract_document = MagicMock(return_value=extraction)
 
     final_text = await service._extract_text(b"%PDF-fake", "pdf", "mixed_scan.pdf")
-    gemini_mock.transcribe_images.assert_awaited_once_with([b"\xff\xd8fake-jpeg"])
+    gemini_mock.transcribe_images.assert_not_awaited()
     assert "Câu 1: Nội dung chữ gốc" in final_text
-    assert "Câu 2: Nội dung đọc từ ảnh scan bằng Gemini Vision?" in final_text
+    assert "Câu 2:" not in final_text
 
 
 @pytest.mark.asyncio

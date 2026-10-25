@@ -85,14 +85,14 @@ class Settings(BaseSettings):
     OCR_ENABLED: bool = True
     # Ngôn ngữ Tesseract, nối bằng "+" (vie = tiếng Việt, eng = tiếng Anh)
     OCR_LANGUAGES: str = "vie+eng"
-    # Độ phân giải render trang PDF trước khi OCR (300 = chuẩn sắc nét cho đề scan)
-    OCR_DPI: int = 300
-    # Số trang PDF tối đa được OCR cục bộ cho 1 file (bảo vệ server nhỏ)
-    OCR_MAX_PAGES: int = 60
+    # 250 DPI giữ được dấu tiếng Việt / nhãn A-D trên đề scan, vẫn nhẹ hơn
+    # mức 300 DPI trước đây. Trang phát hiện thiếu phương án sẽ tự đọc lại 300 DPI.
+    OCR_DPI: int = 250
+    # Số trang PDF tối đa được OCR cục bộ cho 1 file. Giới hạn này giữ một file
+    # scan lớn không chiếm toàn bộ CPU của instance Render.
+    OCR_MAX_PAGES: int = 24
     # Thư mục chứa *.traineddata; để trống → tự tìm (backend/tessdata, env, máy)
     TESSDATA_PREFIX: str | None = None
-    # Khi không có OCR cục bộ, gửi ảnh cho Gemini Vision đọc (cần AI_PROVIDER=gemini)
-    OCR_GEMINI_FALLBACK: bool = True
 
     # --- Authentication ---
     # Google OAuth2 Client ID

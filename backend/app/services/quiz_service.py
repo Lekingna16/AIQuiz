@@ -104,10 +104,10 @@ class QuizService:
         self.db = db
         self.gemini = gemini_service
         settings = get_settings()
-        self.ocr_gemini_fallback = getattr(settings, "OCR_GEMINI_FALLBACK", True)
         self.extractor = TextExtractor(
             ocr=LocalOCREngine.from_settings(settings),
             ocr_max_pages=getattr(settings, "OCR_MAX_PAGES", None),
+            emit_pending_images=False,
         )
 
     async def _run_extractor_isolated(self, file_bytes: bytes, file_type: str) -> ExtractionResult:
@@ -116,13 +116,23 @@ class QuizService:
         để C++ Tesseract không giữ GIL làm nghẽn FastAPI event loop.
         Tự động dùng ``asyncio.to_thread`` cho file TXT hoặc khi unit test mock extractor.
         """
-        can_use_subprocess = (
+        is_ocr_candidate = (
             file_type.lower().strip() in {"pdf", "docx"}
             and type(self.extractor) is TextExtractor
             and "extract_document" not in self.extractor.__dict__
             and type(self.extractor.ocr) is LocalOCREngine
             and self.extractor.ocr.is_available
         )
+        # PDF/DOCX chỉ có text layer không cần mở process OCR. Preflight chạy
+        # trong thread để không chặn event loop khi đọc file lớn.
+        needs_ocr = (
+            await asyncio.to_thread(
+                self.extractor.requires_local_ocr, file_bytes, file_type
+            )
+            if is_ocr_candidate
+            else False
+        )
+        can_use_subprocess = is_ocr_candidate and needs_ocr
         if can_use_subprocess:
             loop = asyncio.get_running_loop()
             ocr_cfg = self.extractor.ocr
@@ -137,6 +147,7 @@ class QuizService:
                     ocr_cfg._tessdata_hint,
                     ocr_cfg.enabled,
                     self.extractor.OCR_MAX_PAGES,
+                    self.extractor.emit_pending_images,
                 )
             except (BrokenProcessPool, PermissionError, OSError) as exc:
                 logger.warning("OCR subprocess unavailable (%s); falling back to thread", exc)
@@ -146,35 +157,24 @@ class QuizService:
 
     async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
         """
-        Trích xuất text (kèm OCR) cho mọi loại file.
+        Trích xuất text (kèm OCR cục bộ) cho mọi loại file.
 
         1. Đọc file + OCR cục bộ (chạy trong process riêng để tránh giữ GIL
            gây timeout cho các request polling trạng thái job)
-        2. Ảnh chưa đọc được (server thiếu dữ liệu OCR cục bộ) → Gemini Vision
-        3. Ghép + clean text
+        2. Ghép + clean text. Không gọi AI để đọc nội dung file; AI chỉ được
+           dùng sau đó để giải đáp án cho các câu đã được parser tách ra.
         """
         result = await self._run_extractor_isolated(file_bytes, file_type)
 
         pending = result.pending_segments
         if pending:
-            limit = self.extractor.SCANNED_PDF_MAX_PAGES
-            transcribe = getattr(self.gemini, "transcribe_images", None)
-            if not self.ocr_gemini_fallback or transcribe is None:
-                logger.warning(
-                    "%s: %d image(s) need OCR but no OCR engine is available",
-                    filename, len(pending),
-                )
-            else:
-                if len(pending) > limit:
-                    logger.warning(
-                        "%s: %d images need OCR, only the first %d are sent to Gemini",
-                        filename, len(pending), limit,
-                    )
-                try:
-                    texts = await transcribe([segment.image for segment in pending[:limit]])
-                    result.resolve_pending(texts)
-                except Exception as exc:
-                    logger.warning("%s: Gemini OCR fallback failed: %s", filename, exc)
+            # Defensive path for custom extractors: production TextExtractor
+            # never creates these segments because emit_pending_images=False.
+            logger.warning(
+                "%s: %d image(s) were skipped because local OCR is unavailable; "
+                "AI is not used to read uploaded files.",
+                filename, len(pending),
+            )
 
         if result.used_ocr:
             logger.info(
@@ -229,9 +229,9 @@ class QuizService:
 
             if not extracted_text.strip() and file_type.lower() in {"pdf", "docx"}:
                 raise ValueError(
-                    "Không đọc được chữ từ tài liệu (có thể là bản scan/ảnh chụp). "
-                    "Máy chủ chưa có dữ liệu OCR tiếng Việt và Gemini Vision không khả dụng. "
-                    "Vui lòng thử lại sau hoặc tải lên file có thể bôi đen/copy chữ."
+                    "Không đọc được chữ từ tài liệu scan. OCR cục bộ tiếng Việt "
+                    "chưa sẵn sàng trên máy chủ; nội dung tải lên không được gửi cho AI. "
+                    "Vui lòng thử file có thể bôi đen/copy chữ hoặc liên hệ quản trị viên."
                 )
 
             # Validate text content
@@ -304,9 +304,10 @@ class QuizService:
                         f"{len(unsolved_questions)} cần AI giải"
                     )
 
-                    # Chỉ gọi AI cho những câu thực sự thiếu đáp án (hoặc cần sửa lỗi OCR nặng)
-                    needs_ocr_repair = self.extractor.has_damaged_ocr_text(extracted_text)
-                    questions_to_process = unique_questions if needs_ocr_repair else unsolved_questions
+                    # AI chỉ giải đáp án của các câu parser chưa tìm được đáp án.
+                    # Không gửi toàn bộ tài liệu/câu hỏi sang AI để "sửa OCR".
+                    needs_ocr_repair = False
+                    questions_to_process = unsolved_questions
                     ai_solved = 0
                     if questions_to_process:
                         logger.info(
@@ -599,7 +600,7 @@ Return ONLY a valid JSON object matching this structure:
 
         # One request at a time prevents a large document from consuming an
         # entire provider rate limit in a few seconds.
-        sem = asyncio.Semaphore(2)
+        sem = asyncio.Semaphore(1)
         async def solve_batch_with_sem(batch_idx, batch):
             async with sem:
                 await solve_batch(batch_idx, batch)

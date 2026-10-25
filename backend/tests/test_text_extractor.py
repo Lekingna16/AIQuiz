@@ -315,6 +315,16 @@ class TestDocxExtraction:
 # ============================================
 
 class TestPdfAndScannedOcr:
+    def test_incomplete_multiple_choice_page_requests_high_quality_retry(self):
+        incomplete = (
+            "Câu 1: Tam chứng gồm:\n"
+            "A. Lựa chọn một\nB. Lựa chọn hai\nC. Lựa chọn ba"
+        )
+        complete = incomplete + "\nD. Lựa chọn bốn"
+
+        assert LocalOCREngine._needs_high_quality_retry(incomplete)
+        assert not LocalOCREngine._needs_high_quality_retry(complete)
+
     def test_extract_pdf(self, extractor, sample_pdf_bytes):
         result = extractor.extract(sample_pdf_bytes, "pdf")
         assert "Machine Learning" in result

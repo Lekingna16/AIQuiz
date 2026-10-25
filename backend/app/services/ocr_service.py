@@ -130,11 +130,14 @@ class LocalOCREngine:
     ROTATION_PROBE_SIDE = 1400
     # Ngưỡng độ sáng trung bình dưới đó ảnh được coi là nền tối (dark mode)
     DARK_BG_LUMA_THRESHOLD = 85
+    # Chỉ dùng mức này để đọc lại một trang đề có dấu hiệu mất phương án.
+    HIGH_QUALITY_DPI = 300
+    HIGH_QUALITY_MAX_RENDER_SIDE = 3600
 
     def __init__(
         self,
         languages: str = "vie+eng",
-        dpi: int = 300,
+        dpi: int = 220,
         tessdata_dir: str | None = None,
         enabled: bool = True,
     ):
@@ -147,7 +150,7 @@ class LocalOCREngine:
     def from_settings(cls, settings) -> "LocalOCREngine":
         return cls(
             languages=getattr(settings, "OCR_LANGUAGES", "vie+eng"),
-            dpi=getattr(settings, "OCR_DPI", 300),
+            dpi=getattr(settings, "OCR_DPI", 250),
             tessdata_dir=getattr(settings, "TESSDATA_PREFIX", None),
             enabled=getattr(settings, "OCR_ENABLED", True),
         )
@@ -233,7 +236,23 @@ class LocalOCREngine:
             return extract_text_from_textpage(page, textpage)
 
         pix = page.get_pixmap(dpi=dpi, alpha=False)
-        return self._ocr_pixmap(pix, allow_rotate=True)
+        text = self._ocr_pixmap(pix, allow_rotate=True)
+
+        # Chỉ trả giá hiệu năng lần hai khi OCR nhanh đã mất một nhãn A-D.
+        # Đây là lỗi thường gặp ở bản scan y khoa: một dòng phương án bị mờ
+        # hoặc dấu tiếng Việt bị dính ở 220-250 DPI.
+        if self._needs_high_quality_retry(text):
+            retry_dpi = self._high_quality_dpi(page.rect, current_dpi=dpi)
+            if retry_dpi > dpi:
+                retry_pix = page.get_pixmap(dpi=retry_dpi, alpha=False)
+                retry_text = self._ocr_pixmap(retry_pix, allow_rotate=True)
+                if self._ocr_result_score(retry_text) >= self._ocr_result_score(text):
+                    logger.info(
+                        "OCR retry at %s DPI recovered a potentially incomplete question page",
+                        retry_dpi,
+                    )
+                    text = retry_text
+        return text
 
     def ocr_clip(
         self,
@@ -298,6 +317,31 @@ class LocalOCREngine:
         if longest_px > cls.MAX_RENDER_SIDE:
             dpi = max(72, int(cls.MAX_RENDER_SIDE * 72.0 / longest_pt))
         return dpi
+
+    @classmethod
+    def _high_quality_dpi(cls, rect: fitz.Rect, current_dpi: int) -> int:
+        """DPI retry cao hơn nhưng vẫn chặn kích thước bitmap ở một trang."""
+        longest_pt = max(float(rect.width), float(rect.height), 1.0)
+        capped = int(cls.HIGH_QUALITY_MAX_RENDER_SIDE * 72.0 / longest_pt)
+        return max(current_dpi, min(cls.HIGH_QUALITY_DPI, max(72, capped)))
+
+    @staticmethod
+    def _option_label_count(text: str) -> int:
+        return len(re.findall(r"(?im)^\s*[A-D]\s*[.):,\-]\s*\S", text or ""))
+
+    @classmethod
+    def _needs_high_quality_retry(cls, text: str) -> bool:
+        """Nhận diện trang đề có câu trắc nghiệm đang thiếu nhãn phương án."""
+        question_count = len(re.findall(
+            r"(?im)^\s*(?:câu|cau|question)\s*\d+\s*[.:)]", text or ""
+        ))
+        option_count = cls._option_label_count(text)
+        return question_count > 0 and option_count > 0 and option_count < question_count * 4
+
+    @classmethod
+    def _ocr_result_score(cls, text: str) -> float:
+        # Ưu tiên không làm rơi nhãn đáp án; sau đó mới so chất lượng ngôn ngữ.
+        return cls._option_label_count(text) * 12.0 + cls._text_quality_score(text)
 
     def _ocr_pixmap(self, pix: fitz.Pixmap, allow_rotate: bool = True) -> str:
         pix = self._normalize_background(pix)

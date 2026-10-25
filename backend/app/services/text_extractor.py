@@ -14,7 +14,7 @@ Hỗ trợ 3 định dạng:
 
 Flow:
   file_bytes + file_type → extract_document() → ExtractionResult (các segment)
-                         → (tuỳ chọn) OCR fallback bằng Gemini cho ảnh chưa đọc được
+                         → OCR cục bộ khi thực sự cần
                          → finalize_text() → cleaned plain text
   extract() = extract_document() + finalize_text() (đồng bộ, dùng OCR cục bộ)
 
@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+import zipfile
 from dataclasses import dataclass, field
 from functools import lru_cache
 from io import BytesIO
@@ -190,8 +191,8 @@ class TextSegment:
     - "text"    : chữ đọc trực tiếp từ file (có thể cần convert TCVN3/VNI)
     - "ocr"     : chữ nhận dạng từ ảnh (luôn là Unicode)
     - "pending" : ảnh cần OCR nhưng chưa có engine cục bộ → ``image`` chứa
-                  JPEG để caller gửi Gemini Vision; ``text`` là nội dung dự
-                  phòng nếu OCR fallback thất bại
+                  JPEG để một caller tùy chọn xử lý tiếp. Luồng upload chính
+                  không tạo loại segment này và không gửi file cho AI.
     """
 
     text: str = ""
@@ -223,7 +224,7 @@ class ExtractionResult:
         return bool(self.ocr_pages or self.ocr_images)
 
     def resolve_pending(self, texts: list[str]) -> None:
-        """Gắn kết quả OCR fallback (cùng thứ tự với ``pending_segments``)."""
+        """Gắn kết quả OCR bên ngoài (cùng thứ tự với ``pending_segments``)."""
         for segment, text in zip(self.pending_segments, texts):
             if text and text.strip():
                 segment.text = text
@@ -454,10 +455,18 @@ class TextExtractor:
     # Trang không chữ, không ảnh nhưng rất nhiều đường vector → chữ bị convert sang outline
     OUTLINED_TEXT_MIN_DRAWINGS = 150
     # Giới hạn số trang PDF được OCR cục bộ trong 1 file để bảo vệ server
-    OCR_MAX_PAGES = 60
+    OCR_MAX_PAGES = 24
 
-    def __init__(self, ocr: LocalOCREngine | None = None, ocr_max_pages: int | None = None):
+    def __init__(
+        self,
+        ocr: LocalOCREngine | None = None,
+        ocr_max_pages: int | None = None,
+        emit_pending_images: bool = True,
+    ):
         self.ocr = ocr if ocr is not None else LocalOCREngine()
+        # Thư viện vẫn hỗ trợ trả ảnh pending cho các caller độc lập. Pipeline
+        # upload đặt cờ này False để tuyệt đối không dựng JPEG rồi gửi AI đọc file.
+        self.emit_pending_images = emit_pending_images
         if ocr_max_pages is not None:
             self.OCR_MAX_PAGES = ocr_max_pages
 
@@ -465,6 +474,45 @@ class TextExtractor:
     def has_damaged_ocr_text(text: str) -> bool:
         """Detect a non-empty PDF text layer that is visibly OCR-corrupted."""
         return bool(text) and len(OCR_DAMAGE_PATTERN.findall(text)) >= 2
+
+    @classmethod
+    def requires_local_ocr(cls, file_bytes: bytes, file_type: str) -> bool:
+        """Trả về ``True`` khi file có khả năng cần Tesseract.
+
+        Đây là preflight nhẹ, dùng trước khi tạo tiến trình OCR. Tài liệu có
+        lớp chữ gốc sẽ được xử lý ngay trong worker thread thường, tránh chi
+        phí khởi tạo process và sao chép bytes qua process cho mỗi lần upload.
+        Khi không chắc chắn, hàm trả về ``True`` để ưu tiên không bỏ sót ảnh.
+        """
+        kind = file_type.lower().strip()
+        if kind == "pdf":
+            try:
+                doc = fitz.open(stream=file_bytes, filetype="pdf")
+                try:
+                    if doc.needs_pass and not doc.authenticate(""):
+                        return True
+                    for page in doc:
+                        raw_text = page.get_text("text")
+                        if not raw_text.strip() or cls.has_damaged_ocr_text(raw_text):
+                            return True
+                        # Một ảnh nhúng lớn có thể là câu hỏi/bảng không có text layer.
+                        # Để extractor đầy đủ kiểm tra chính xác ở process OCR.
+                        if page.get_images(full=False):
+                            return True
+                    return False
+                finally:
+                    doc.close()
+            except Exception:
+                return True
+
+        if kind == "docx":
+            try:
+                with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
+                    return any(name.startswith("word/media/") for name in archive.namelist())
+            except (OSError, zipfile.BadZipFile):
+                return True
+
+        return False
 
     def extract(self, file_bytes: bytes, file_type: str) -> str:
         """
@@ -653,12 +701,17 @@ class TextExtractor:
                 result.segments.append(TextSegment(text=fallback_text))
             return
 
-        result.segments.append(TextSegment(
-            text=fallback_text,
-            source="pending",
-            image=_render_rect_jpeg(page, page.rect),
-            label=f"page {page_number}",
-        ))
+        if self.emit_pending_images:
+            result.segments.append(TextSegment(
+                text=fallback_text,
+                source="pending",
+                image=_render_rect_jpeg(page, page.rect),
+                label=f"page {page_number}",
+            ))
+        elif fallback_text:
+            result.segments.append(TextSegment(text=fallback_text))
+        else:
+            result.skipped_ocr_pages.append(page_number)
 
     def _process_mixed_pdf_page(
         self,
@@ -718,12 +771,14 @@ class TextExtractor:
                     result.segments.append(TextSegment(text=ocr_text, source="ocr", label=label))
                     result.ocr_images += 1
                     used_page_ocr = True
-            else:
+            elif self.emit_pending_images:
                 result.segments.append(TextSegment(
                     source="pending",
                     image=_render_rect_jpeg(page, cluster.rect, preferred_dpi=max(220, int(cluster.dpi))),
                     label=label,
                 ))
+            else:
+                result.skipped_ocr_pages.append(page_number)
 
         flush_native()
         if used_page_ocr and page_number not in result.ocr_pages:
@@ -1604,9 +1659,10 @@ class _DocxReader:
                 self.result.ocr_images += 1
             return
 
-        jpeg = _to_jpeg(blob)
-        if jpeg:
-            self.result.segments.append(TextSegment(source="pending", image=jpeg, label=rid))
+        if self.emit_pending_images:
+            jpeg = _to_jpeg(blob)
+            if jpeg:
+                self.result.segments.append(TextSegment(source="pending", image=jpeg, label=rid))
 
     def _flush_lines(self) -> None:
         if not self.lines:
@@ -1648,6 +1704,7 @@ def _cached_worker_extractor(
     tessdata_dir: str | None,
     enabled: bool,
     ocr_max_pages: int,
+    emit_pending_images: bool,
 ) -> TextExtractor:
     """Khởi tạo và tái sử dụng TextExtractor bên trong tiến trình worker OCR."""
     ocr = LocalOCREngine(
@@ -1656,7 +1713,11 @@ def _cached_worker_extractor(
         tessdata_dir=tessdata_dir,
         enabled=enabled,
     )
-    return TextExtractor(ocr=ocr, ocr_max_pages=ocr_max_pages)
+    return TextExtractor(
+        ocr=ocr,
+        ocr_max_pages=ocr_max_pages,
+        emit_pending_images=emit_pending_images,
+    )
 
 
 def extract_document_worker(
@@ -1666,7 +1727,8 @@ def extract_document_worker(
     dpi: int = 250,
     tessdata_dir: str | None = None,
     enabled: bool = True,
-    ocr_max_pages: int = 60,
+    ocr_max_pages: int = 24,
+    emit_pending_images: bool = True,
 ) -> ExtractionResult:
     """
     Hàm top-level (picklable cho Windows ``spawn``) chạy trích xuất file + Tesseract OCR
@@ -1679,5 +1741,6 @@ def extract_document_worker(
         tessdata_dir=tessdata_dir,
         enabled=enabled,
         ocr_max_pages=ocr_max_pages,
+        emit_pending_images=emit_pending_images,
     )
     return extractor.extract_document(file_bytes, file_type)
