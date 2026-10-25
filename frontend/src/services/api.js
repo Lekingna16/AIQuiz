@@ -130,9 +130,9 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
-      // This request only transfers the file and queues work; it should not
-      // stay open while OCR or AI generation runs.
-      timeout: 60000,
+      // This request only transfers the file and queues work; allow up to 2m
+      // for large PDFs (up to 50MB) on slower connections.
+      timeout: 120000,
       // Theo dõi tiến trình upload file
       onUploadProgress: onProgress
         ? (progressEvent) => {
@@ -148,22 +148,47 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
 };
 
 export const getUploadJob = async (jobId) => {
-  const response = await api.get(`/api/documents/jobs/${jobId}`);
+  const response = await api.get(`/api/documents/jobs/${jobId}`, {
+    timeout: 30000,
+  });
   return response.data;
 };
 
 export const waitForUploadJob = async (jobId, onStatus) => {
   const deadline = Date.now() + (15 * 60 * 1000);
+  let consecutivePollErrors = 0;
+  const maxConsecutivePollErrors = 6;
 
   while (Date.now() < deadline) {
-    const job = await getUploadJob(jobId);
-    onStatus?.(job.status);
+    try {
+      const job = await getUploadJob(jobId);
+      consecutivePollErrors = 0;
+      onStatus?.(job.status);
 
-    if (job.status === "completed") return job;
-    if (job.status === "failed") {
-      const error = new Error(job.error || "Không thể xử lý tài liệu.");
-      error.friendlyMessage = job.error;
-      throw error;
+      if (job.status === "completed") return job;
+      if (job.status === "failed") {
+        const error = new Error(job.error || "Không thể xử lý tài liệu.");
+        error.friendlyMessage = job.error;
+        throw error;
+      }
+    } catch (error) {
+      const status = error.response?.status;
+      const isTransient =
+        error.code === "ECONNABORTED" ||
+        error.code === "ERR_NETWORK" ||
+        error.message?.includes("timeout") ||
+        status === 502 ||
+        status === 503 ||
+        status === 504;
+
+      if (!isTransient) {
+        throw error;
+      }
+
+      consecutivePollErrors += 1;
+      if (consecutivePollErrors >= maxConsecutivePollErrors) {
+        throw error;
+      }
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, 2000));

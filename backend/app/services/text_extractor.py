@@ -33,6 +33,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from functools import lru_cache
 from io import BytesIO
 
 import chardet
@@ -55,6 +56,7 @@ WATERMARK_LINE_PATTERN = re.compile(
     r"|^\s*scanned\s+(?:by|with)\s+(?:camscanner|tapscanner|fastscanner|clearscanner|vflat)\b"
     r"|^\s*camscanner\s*$"
     r"|^\s*cs\s+scanned\s+with\s+camscanner\b"
+    r"|^\s*min\s*min\s*team\b.*$"
     r")",
     re.IGNORECASE,
 )
@@ -65,11 +67,13 @@ _TRIVIAL_PAGE_NO_LINE = re.compile(
     re.IGNORECASE,
 )
 
-# A number embedded inside a Vietnamese word is a strong signal that the PDF
-# contains a damaged OCR text layer (for example, ``ntr6c`` instead of
-# ``nước``). Ordinary numbering such as ``Câu 10`` does not match.
+# A number embedded inside a lowercase Vietnamese word is a strong signal that
+# the PDF contains a damaged OCR text layer (for example, ``ntr6c`` instead of
+# ``nước``). Uppercase codes/formulas such as ``YY091602e``, ``HbA1c``, ``H5N1``
+# or ordinary numbering such as ``Câu 10`` do not match.
 OCR_DAMAGE_PATTERN = re.compile(
-    r"(?iu)\b[^\W\d_]+\d+[^\W\d_]+\b|\b(?:ntr6c|nur&c|h6a|h0i|nh6m|strc|lurong)\b"
+    r"(?u)\b[A-ZÀ-Ỹ]?[a-zà-ỹ]+\d{1,2}[a-zà-ỹ]+\b"
+    r"|\b(?i:ntr6c|nur&c|h6a|h0i|nh6m|strc|lurong)\b"
 )
 
 # ============================================
@@ -870,6 +874,16 @@ class TextExtractor:
             )
 
             for line in lines:
+                # Bỏ qua các dòng chữ xoay chéo (15°–75°) — 100% là watermark chéo nền trang
+                line_dir = line.get("dir")
+                if (
+                    isinstance(line_dir, (tuple, list))
+                    and len(line_dir) == 2
+                    and 0.20 <= abs(float(line_dir[0])) <= 0.96
+                    and 0.20 <= abs(float(line_dir[1])) <= 0.96
+                ):
+                    continue
+
                 pieces: list[tuple[str, frozenset]] = []
                 prev_x1: float | None = None
                 prev_size: float = 12.0
@@ -1625,3 +1639,45 @@ def _to_jpeg(image_bytes: bytes) -> bytes | None:
         return pix.tobytes("jpeg")
     except Exception:
         return None
+
+
+@lru_cache(maxsize=4)
+def _cached_worker_extractor(
+    languages: str,
+    dpi: int,
+    tessdata_dir: str | None,
+    enabled: bool,
+    ocr_max_pages: int,
+) -> TextExtractor:
+    """Khởi tạo và tái sử dụng TextExtractor bên trong tiến trình worker OCR."""
+    ocr = LocalOCREngine(
+        languages=languages,
+        dpi=dpi,
+        tessdata_dir=tessdata_dir,
+        enabled=enabled,
+    )
+    return TextExtractor(ocr=ocr, ocr_max_pages=ocr_max_pages)
+
+
+def extract_document_worker(
+    file_bytes: bytes,
+    file_type: str,
+    languages: str = "vie+eng",
+    dpi: int = 250,
+    tessdata_dir: str | None = None,
+    enabled: bool = True,
+    ocr_max_pages: int = 60,
+) -> ExtractionResult:
+    """
+    Hàm top-level (picklable cho Windows ``spawn``) chạy trích xuất file + Tesseract OCR
+    trong tiến trình riêng (``ProcessPoolExecutor``), đảm bảo C++ Tesseract KHÔNG giữ
+    Python GIL của tiến trình FastAPI/Uvicorn.
+    """
+    extractor = _cached_worker_extractor(
+        languages=languages,
+        dpi=dpi,
+        tessdata_dir=tessdata_dir,
+        enabled=enabled,
+        ocr_max_pages=ocr_max_pages,
+    )
+    return extractor.extract_document(file_bytes, file_type)

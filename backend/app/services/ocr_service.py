@@ -120,10 +120,14 @@ class LocalOCREngine:
 
     # Ảnh nhỏ hơn ngưỡng này (px) gần như chắc chắn là icon/logo → bỏ qua
     MIN_IMAGE_SIDE = 32
+    # Tỷ lệ khung hình quá dẹt (đường kẻ viền / thanh phân cách) → bỏ qua
+    MAX_ASPECT_RATIO = 45.0
     # Cạnh dài tối thiểu mong muốn khi phóng to ảnh độ phân giải thấp
     UPSCALE_BELOW = 1400
-    # Giới hạn cạnh dài bitmap khi render trang/ảnh để bảo vệ bộ nhớ
-    MAX_RENDER_SIDE = 3500
+    # Giới hạn cạnh dài bitmap khi render trang/ảnh để giữ nét dấu/chấm câu mà vẫn nhanh
+    MAX_RENDER_SIDE = 3000
+    # Cạnh dài tối đa khi chạy thử xoay 90°/270° phát hiện trang nằm ngang
+    ROTATION_PROBE_SIDE = 1400
     # Ngưỡng độ sáng trung bình dưới đó ảnh được coi là nền tối (dark mode)
     DARK_BG_LUMA_THRESHOLD = 85
 
@@ -253,6 +257,8 @@ class LocalOCREngine:
         pix = page.get_pixmap(dpi=dpi, clip=clip_rect, alpha=False)
         if min(pix.width, pix.height) < self.MIN_IMAGE_SIDE:
             return ""
+        if max(pix.width, pix.height) / max(1, min(pix.width, pix.height)) > self.MAX_ASPECT_RATIO:
+            return ""
         return self._ocr_pixmap(pix, allow_rotate=True)
 
     def ocr_image(self, image_bytes: bytes) -> str:
@@ -299,17 +305,23 @@ class LocalOCREngine:
 
         if allow_rotate and self._looks_sideways_gibberish(text):
             initial_score = self._text_quality_score(text)
-            best_text = text
+            best_angle: int | None = None
+            best_probe_text = ""
             best_score = initial_score
             for angle in (90, 270):
-                rotated = self._rotate_pixmap(pix, angle)
-                candidate = self._run_tesseract_on_pixmap(rotated)
+                probe_pix = self._rotate_pixmap(pix, angle, max_side=self.ROTATION_PROBE_SIDE)
+                candidate = self._run_tesseract_on_pixmap(probe_pix)
                 score = self._text_quality_score(candidate)
                 if score > best_score:
-                    best_text = candidate
+                    best_angle = angle
+                    best_probe_text = candidate
                     best_score = score
-            if best_score > max(initial_score * 1.35, initial_score + 1.5):
-                text = best_text
+            if best_angle is not None and best_score > max(initial_score * 1.45, initial_score + 2.5):
+                if max(pix.width, pix.height) > self.ROTATION_PROBE_SIDE + 100:
+                    full_rotated = self._rotate_pixmap(pix, best_angle)
+                    text = self._run_tesseract_on_pixmap(full_rotated)
+                else:
+                    text = best_probe_text
 
         return text
 
@@ -340,6 +352,8 @@ class LocalOCREngine:
             return None
 
         if min(raw.width, raw.height) < cls.MIN_IMAGE_SIDE:
+            return None
+        if max(raw.width, raw.height) / max(1, min(raw.width, raw.height)) > cls.MAX_ASPECT_RATIO:
             return None
 
         longest = max(raw.width, raw.height)
@@ -372,23 +386,52 @@ class LocalOCREngine:
 
     @classmethod
     def _normalize_background(cls, pix: fitz.Pixmap) -> fitz.Pixmap:
-        """Nếu ảnh có nền tối (dark mode screenshot), đảo màu về chữ đen nền sáng."""
+        """
+        Chuẩn hoá nền ảnh trước khi đưa vào Tesseract:
+        1. Nền tối (dark mode screenshot) → đảo màu về chữ đen nền sáng.
+        2. Trang giấy sáng có chữ mực đậm → làm trắng các watermark xám nhạt /
+           bóng giấy scan (luma ~150-240) bằng bảng tra C-level ``bytes.translate``
+           để watermark chéo không làm dính chữ cái đáp án (vd: ``C.`` → ``€.``).
+        """
         samples = pix.samples
         if not samples:
             return pix
-        step = max(1, len(samples) // 4096)
+        step = max(1, len(samples) // 8192)
         sampled = samples[::step]
+        if not sampled:
+            return pix
         mean_luma = sum(sampled) / len(sampled)
         if mean_luma < cls.DARK_BG_LUMA_THRESHOLD:
             inverted = fitz.Pixmap(pix)
             inverted.invert_irect(inverted.irect)
             return inverted
+
+        if mean_luma >= 195 and pix.colorspace is not None and pix.n in (1, 3) and not pix.alpha:
+            sorted_s = sorted(sampled)
+            n = len(sorted_s)
+            ink_floor = sorted_s[max(0, int(n * 0.005))]
+            paper_bg = sorted_s[min(n - 1, int(n * 0.75))]
+            if paper_bg >= 215 and ink_floor <= 95:
+                black_pt = min(55, ink_floor + 25)
+                white_pt = max(145, min(172, int(ink_floor * 0.45 + paper_bg * 0.55)))
+                span = max(1, white_pt - black_pt)
+                lut = bytes(
+                    0 if v <= black_pt else (255 if v >= white_pt else int((v - black_pt) * 255 / span))
+                    for v in range(256)
+                )
+                cleaned = samples.translate(lut)
+                return fitz.Pixmap(pix.colorspace, pix.width, pix.height, cleaned, False)
+
         return pix
 
     @staticmethod
-    def _rotate_pixmap(pix: fitz.Pixmap, angle: int) -> fitz.Pixmap:
+    def _rotate_pixmap(pix: fitz.Pixmap, angle: int, max_side: int | None = None) -> fitz.Pixmap:
         swap = angle in (90, 270)
         w, h = (pix.height, pix.width) if swap else (pix.width, pix.height)
+        if max_side and max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            w = max(1, int(round(w * scale)))
+            h = max(1, int(round(h * scale)))
         doc = fitz.open()
         try:
             page = doc.new_page(width=w, height=h)
@@ -403,12 +446,27 @@ class LocalOCREngine:
         lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
         if len(lines) < 4:
             return False
+        # Nếu đã thấy cấu trúc câu hỏi / phương án hoặc bảng mã đáp án → trang đang đúng chiều
+        if re.search(r"(?im)^\s*(?:Câu|Cau|Question)\s*\d+|^\s*[A-D][.):]\s+\S", text):
+            return False
+        if len(re.findall(r"\b\d{1,3}\s*[.:|\-]?\s*[A-D]\b", text)) >= 5:
+            return False
+        if len(re.findall(r"\b[A-Z]{2,}\d{3,}\b", text)) >= 4:
+            return False
+
         avg_len = sum(len(ln) for ln in lines) / len(lines)
+        clean_two_word = sum(
+            1 for ln in lines
+            if sum(1 for tok in ln.split() if re.fullmatch(r"[^\W\d_]{2,}[.,?:;)]?", tok)) >= 2
+        )
+        if clean_two_word >= 3:
+            return False
+
         clean_multi_word = sum(
             1 for ln in lines
             if sum(1 for tok in ln.split() if re.fullmatch(r"[^\W\d_]{2,}[.,?:;)]?", tok)) >= 3
         )
-        return avg_len < 10.0 and (clean_multi_word / len(lines)) < 0.25
+        return avg_len < 10.0 and (clean_multi_word / len(lines)) < 0.20
 
     @staticmethod
     def _text_quality_score(text: str) -> float:
@@ -418,14 +476,23 @@ class LocalOCREngine:
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
         if not lines:
             return 0.0
-        clean_words = sum(
-            1
+        clean_tokens = [
+            tok.rstrip(".,?:;)").lower()
             for ln in lines
             for tok in ln.split()
             if re.fullmatch(r"[^\W\d_]{2,}[.,?:;)]?", tok)
-        )
+        ]
+        # Giảm trọng số khi OCR sinh chuỗi ký tự lặp vô nghĩa (vd: "CÓ CÓ CÓ", "ANNAN")
+        unique_bonus = min(len(set(clean_tokens)), 40)
+        clean_words = min(len(clean_tokens), unique_bonus * 2 + 4)
         clean_chars = sum(1 for ch in text if ch.isalnum() or ch in " \n.,?:;()-/")
         clean_ratio = clean_chars / max(1, len(text))
         words_per_line = clean_words / len(lines)
-        quiz_markers = len(re.findall(r"(?m)^\s*(?:Câu\s*\d+|[A-D][.):])\s+\S", text))
-        return (words_per_line * 6.0 + min(clean_words, 40) * 0.3 + quiz_markers * 4.0) * clean_ratio
+        quiz_markers = len(re.findall(r"(?im)^\s*(?:Câu|Cau|Question)\s*\d+|^\s*[A-D][.):]\s+\S", text))
+        answer_pairs = min(10, len(re.findall(r"\b\d{1,3}\s+[A-D]\b", text)))
+        return (
+            words_per_line * 6.0
+            + min(clean_words, 40) * 0.3
+            + quiz_markers * 4.0
+            + answer_pairs * 1.5
+        ) * clean_ratio

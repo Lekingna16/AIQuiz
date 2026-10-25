@@ -85,8 +85,8 @@ class Settings(BaseSettings):
     OCR_ENABLED: bool = True
     # Ngôn ngữ Tesseract, nối bằng "+" (vie = tiếng Việt, eng = tiếng Anh)
     OCR_LANGUAGES: str = "vie+eng"
-    # Độ phân giải render trang PDF trước khi OCR (250 = cân bằng tốc độ & độ nét)
-    OCR_DPI: int = 250
+    # Độ phân giải render trang PDF trước khi OCR (300 = chuẩn sắc nét cho đề scan)
+    OCR_DPI: int = 300
     # Số trang PDF tối đa được OCR cục bộ cho 1 file (bảo vệ server nhỏ)
     OCR_MAX_PAGES: int = 60
     # Thư mục chứa *.traineddata; để trống → tự tìm (backend/tessdata, env, máy)

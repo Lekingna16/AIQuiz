@@ -577,3 +577,19 @@ class TestValidationAndEdgeCases:
         assert not extractor.has_damaged_ocr_text(
             "Câu 10: Nhà nước có sự phân hóa giai cấp trong xã hội."
         )
+        assert not extractor.has_damaged_ocr_text(
+            "YY091602e 2020 HbA1c G6PD H5N1 SpO2"
+        )
+
+    def test_diagonal_watermark_ignored_in_native_pdf(self, extractor):
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((72, 100), "YY091602 2 1 D")
+        page.insert_text((72, 120), "YY091602 2 2 B")
+        page.insert_text((180, 300), "Min Min Team - Since 2020", morph=(fitz.Point(180, 300), fitz.Matrix(45)))
+        pdf_bytes = doc.tobytes()
+        doc.close()
+
+        extracted = extractor.extract(pdf_bytes, "pdf")
+        assert "YY091602 2 1 D" in extracted
+        assert "Min Min Team" not in extracted

@@ -117,3 +117,25 @@ async def test_quiz_service_resolves_pending_ocr_segments_with_gemini_fallback()
     gemini_mock.transcribe_images.assert_awaited_once_with([b"\xff\xd8fake-jpeg"])
     assert "Câu 1: Nội dung chữ gốc" in final_text
     assert "Câu 2: Nội dung đọc từ ảnh scan bằng Gemini Vision?" in final_text
+
+
+@pytest.mark.asyncio
+async def test_quiz_service_runs_real_pdf_ocr_via_subprocess_worker():
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=400)
+    page.insert_text((72, 100), "Cau 1: Test subprocess extraction?\nA. One\nB. Two\nC. Three\nD. Four")
+    pix = page.get_pixmap(dpi=180, alpha=False)
+    doc.close()
+
+    scan_doc = fitz.open()
+    sp = scan_doc.new_page(width=595, height=400)
+    sp.insert_image(sp.rect, stream=pix.tobytes("png"))
+    pdf_bytes = scan_doc.tobytes()
+    scan_doc.close()
+
+    service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    text = await service._extract_text(pdf_bytes, "pdf", "scan_worker.pdf")
+    assert "subprocess" in text.lower()
+    assert "A." in text and "D." in text

@@ -104,10 +104,11 @@ const FileUpload = ({ forcedMode }) => {
   const [major, setMajor] = useState("");
   const [subject, setSubject] = useState("");
   const [examType, setExamType] = useState("");
+  const DEFAULT_EXAM_TYPES = ["Ôn tập", "Giữa kỳ", "Cuối kỳ"];
   const [metadataOptions, setMetadataOptions] = useState({
     majors: [],
     courses_by_major: {},
-    exam_types: [],
+    exam_types: DEFAULT_EXAM_TYPES,
   });
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
   
@@ -123,7 +124,7 @@ const FileUpload = ({ forcedMode }) => {
           setMetadataOptions({
             majors: options.majors || [],
             courses_by_major: options.courses_by_major || {},
-            exam_types: options.exam_types || [],
+            exam_types: options.exam_types?.length ? options.exam_types : DEFAULT_EXAM_TYPES,
           });
         }
       } catch (error) {

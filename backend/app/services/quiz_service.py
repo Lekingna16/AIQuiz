@@ -35,9 +35,12 @@ Flow chi tiết:
 """
 
 import asyncio
+import atexit
 import logging
 import json
 import re
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -45,7 +48,11 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
 from app.services.ocr_service import LocalOCREngine
-from app.services.text_extractor import TextExtractor
+from app.services.text_extractor import (
+    ExtractionResult,
+    TextExtractor,
+    extract_document_worker,
+)
 from app.services.ai_service import (
     DeepSeekService,
     DeepSeekServiceError,
@@ -55,6 +62,30 @@ from app.services.ai_service import (
 from app.utils.text_processing import preprocess_text
 
 logger = logging.getLogger(__name__)
+
+# Tách trích xuất PDF/DOCX + C++ Tesseract sang tiến trình riêng để KHÔNG giữ
+# Python GIL của tiến trình Uvicorn, giúp các API polling (/jobs/{id}) luôn phản hồi tức thì.
+_ocr_process_pool: ProcessPoolExecutor | None = None
+
+
+def _get_ocr_process_pool() -> ProcessPoolExecutor:
+    global _ocr_process_pool
+    if _ocr_process_pool is None:
+        _ocr_process_pool = ProcessPoolExecutor(max_workers=1)
+    return _ocr_process_pool
+
+
+def _shutdown_ocr_process_pool() -> None:
+    global _ocr_process_pool
+    if _ocr_process_pool is not None:
+        try:
+            _ocr_process_pool.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
+        _ocr_process_pool = None
+
+
+atexit.register(_shutdown_ocr_process_pool)
 
 
 class QuizService:
@@ -79,16 +110,50 @@ class QuizService:
             ocr_max_pages=getattr(settings, "OCR_MAX_PAGES", None),
         )
 
+    async def _run_extractor_isolated(self, file_bytes: bytes, file_type: str) -> ExtractionResult:
+        """
+        Chạy trích xuất tài liệu trong ``ProcessPoolExecutor`` đối với PDF/DOCX có OCR
+        để C++ Tesseract không giữ GIL làm nghẽn FastAPI event loop.
+        Tự động dùng ``asyncio.to_thread`` cho file TXT hoặc khi unit test mock extractor.
+        """
+        can_use_subprocess = (
+            file_type.lower().strip() in {"pdf", "docx"}
+            and type(self.extractor) is TextExtractor
+            and "extract_document" not in self.extractor.__dict__
+            and type(self.extractor.ocr) is LocalOCREngine
+            and self.extractor.ocr.is_available
+        )
+        if can_use_subprocess:
+            loop = asyncio.get_running_loop()
+            ocr_cfg = self.extractor.ocr
+            try:
+                return await loop.run_in_executor(
+                    _get_ocr_process_pool(),
+                    extract_document_worker,
+                    file_bytes,
+                    file_type,
+                    ocr_cfg.requested_languages,
+                    ocr_cfg.dpi,
+                    ocr_cfg._tessdata_hint,
+                    ocr_cfg.enabled,
+                    self.extractor.OCR_MAX_PAGES,
+                )
+            except (BrokenProcessPool, PermissionError, OSError) as exc:
+                logger.warning("OCR subprocess unavailable (%s); falling back to thread", exc)
+                _shutdown_ocr_process_pool()
+
+        return await asyncio.to_thread(self.extractor.extract_document, file_bytes, file_type)
+
     async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
         """
         Trích xuất text (kèm OCR) cho mọi loại file.
 
-        1. Đọc file + OCR cục bộ (chạy trong thread vì OCR tốn CPU, tránh
-           block event loop của FastAPI)
+        1. Đọc file + OCR cục bộ (chạy trong process riêng để tránh giữ GIL
+           gây timeout cho các request polling trạng thái job)
         2. Ảnh chưa đọc được (server thiếu dữ liệu OCR cục bộ) → Gemini Vision
         3. Ghép + clean text
         """
-        result = await asyncio.to_thread(self.extractor.extract_document, file_bytes, file_type)
+        result = await self._run_extractor_isolated(file_bytes, file_type)
 
         pending = result.pending_segments
         if pending:
@@ -426,7 +491,7 @@ class QuizService:
         
         # Returning corrected text and choices has a larger JSON payload than
         # answer-only solving, so use smaller batches to avoid truncation.
-        BATCH_SIZE = 60 if not repair_ocr else 10
+        BATCH_SIZE = 60 if not repair_ocr else 20
         # Khởi tạo mảng kết quả với cùng kích thước, mặc định rỗng
         all_solved = [None] * len(questions)
         
@@ -512,7 +577,11 @@ Return ONLY a valid JSON object matching this structure:
                 # Map kết quả về vị trí gốc bằng index
                 for solved_q in batch_solved:
                     # Lấy index từ AI response (1-based) → convert về 0-based
-                    ai_index = solved_q.get("index")
+                    raw_index = solved_q.get("index")
+                    try:
+                        ai_index = int(raw_index) if raw_index is not None else None
+                    except (TypeError, ValueError):
+                        ai_index = None
                     if ai_index is not None and 1 <= ai_index <= len(batch):
                         original_idx = batch[ai_index - 1][0]  # index gốc trong questions[]
                         all_solved[original_idx] = solved_q
@@ -530,7 +599,7 @@ Return ONLY a valid JSON object matching this structure:
 
         # One request at a time prevents a large document from consuming an
         # entire provider rate limit in a few seconds.
-        sem = asyncio.Semaphore(1)
+        sem = asyncio.Semaphore(2)
         async def solve_batch_with_sem(batch_idx, batch):
             async with sem:
                 await solve_batch(batch_idx, batch)
