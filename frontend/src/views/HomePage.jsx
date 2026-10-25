@@ -10,11 +10,8 @@ function HomePage() {
   // Filters
   const [subject, setSubject] = useState("");
   const [examType, setExamType] = useState("");
-  const [school, setSchool] = useState("");
-
   const [filterOptions, setFilterOptions] = useState({
     subjects: [],
-    schools: [],
   });
 
   const fetchFilters = async () => {
@@ -32,7 +29,6 @@ function HomePage() {
       const filters = {};
       if (subject) filters.subject = subject;
       if (examType) filters.exam_type = examType;
-      if (school) filters.school = school;
       
       const data = await getQuizzes(1, 20, filters);
       setQuizzes(data.quizzes || []);
@@ -49,7 +45,7 @@ function HomePage() {
 
   useEffect(() => {
     fetchQuizzes();
-  }, [subject, examType, school]);
+  }, [subject, examType]);
 
   return (
     <div className="home-page">
@@ -102,17 +98,6 @@ function HomePage() {
               <option value="">Tất cả kỳ thi</option>
               <option value="Giữa kì">Giữa kì</option>
               <option value="Cuối kì">Cuối kì</option>
-            </select>
-            <select 
-              value={school} 
-              onChange={e => setSchool(e.target.value)}
-              className="form-input"
-              style={{ flex: 1, minWidth: "150px" }}
-            >
-              <option value="">Tất cả trường học</option>
-              {filterOptions.schools.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
             </select>
           </div>
 

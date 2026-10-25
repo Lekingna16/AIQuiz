@@ -21,6 +21,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config import get_settings
 from app.database import get_db
+from app.education_catalog import EXAM_TYPES
+from app.services.education_catalog_service import is_known_major
 from app.models.document import DocumentResponse
 from app.models.quiz import QuizResponse, Difficulty
 from app.models.user import UserResponse
@@ -158,15 +160,11 @@ async def delete_document(
 
     quizzes = await db.quizzes.find({"document_id": document_id}).to_list(length=None)
     quiz_ids = [str(quiz["_id"]) for quiz in quizzes]
-    question_ids = []
     if quiz_ids:
         questions = await db.questions.find({"quiz_id": {"$in": quiz_ids}}).to_list(length=None)
-        question_ids = [str(question["_id"]) for question in questions]
         await db.questions.delete_many({"quiz_id": {"$in": quiz_ids}})
         await db.quizzes.delete_many({"_id": {"$in": [ObjectId(quiz_id) for quiz_id in quiz_ids]}})
         await db.quiz_attempts.delete_many({"quiz_id": {"$in": [ObjectId(quiz_id) for quiz_id in quiz_ids]}})
-    if question_ids:
-        await db.comments.delete_many({"question_id": {"$in": question_ids}})
 
     await db.documents.delete_one({"_id": ObjectId(document_id)})
     return {"message": "Uploaded document deleted", "deleted_quizzes": len(quiz_ids)}
@@ -182,7 +180,7 @@ async def delete_document(
     Flow: File → Validate → Extract Text → AI Generate → Save DB → Response
     
     **Giới hạn:**
-    - File tối đa 10MB
+    - File tối đa 50MB
     - Hỗ trợ: .pdf, .docx, .txt
     - Số câu hỏi: 5-30
     
@@ -190,7 +188,7 @@ async def delete_document(
     """,
     responses={
         400: {"description": "File type not supported / Invalid input"},
-        413: {"description": "File too large (max 10MB)"},
+        413: {"description": "File too large (max 50MB)"},
         422: {"description": "Could not extract text from file"},
         503: {"description": "AI service unavailable"},
     },
@@ -198,7 +196,7 @@ async def delete_document(
 async def upload_document(
     file: UploadFile = File(
         ...,
-        description="File tài liệu (PDF, DOCX, TXT). Max 10MB.",
+        description="File tài liệu (PDF, DOCX, TXT). Max 50MB.",
     ),
     num_questions: int = Query(
         default=10,
@@ -222,6 +220,10 @@ async def upload_document(
         default=True,
         description="Cho phép quiz hiển thị công khai",
     ),
+    subject: str = Query(min_length=1, max_length=150),
+    major: str = Query(min_length=1, max_length=150),
+    exam_type: str = Query(min_length=1, max_length=150),
+    school: str | None = None,
     current_user: UserResponse | None = Depends(get_current_user_optional),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
@@ -231,6 +233,16 @@ async def upload_document(
     Pipeline hoàn chỉnh xử lý từ file bytes đến quiz data.
     """
     settings = get_settings()
+    subject = subject.strip()
+    major = major.strip()
+    exam_type = exam_type.strip()
+    school = school.strip() if school else None
+
+    if not await is_known_major(db, major) or exam_type not in EXAM_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Major and exam type must be selected from the provided catalog.",
+        )
 
     # =====================
     # Step 1: Validate file type (trước khi đọc content)
@@ -281,6 +293,10 @@ async def upload_document(
             mode=mode,
             user_id=str(current_user.id) if current_user else None,
             is_public=is_public,
+            subject=subject,
+            major=major,
+            exam_type=exam_type,
+            school=school,
         )
 
         return result

@@ -1,0 +1,8 @@
+# Python runtime and test artefacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+
+# Local server output
+*.log

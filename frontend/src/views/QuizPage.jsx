@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Check, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
-import { getQuiz, submitQuiz } from "../services/api";
+import { checkQuizAnswer, getQuiz, submitQuiz } from "../services/api";
 import QuestionCard from "../components/QuestionCard";
 import ResultsSummary from "../components/ResultsSummary";
 
@@ -19,6 +19,8 @@ function QuizPage() {
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState({});
+  const [answerResults, setAnswerResults] = useState({});
+  const [checkingQuestionId, setCheckingQuestionId] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultsData, setResultsData] = useState(null);
@@ -39,11 +41,28 @@ function QuizPage() {
     fetchQuiz();
   }, [quizId]);
 
-  const handleSelectAnswer = (questionId, selectedKey) => {
+  const handleSelectAnswer = async (questionId, selectedKey) => {
+    if (answers[questionId] || checkingQuestionId === questionId) return;
+
     setAnswers(prev => ({
       ...prev,
       [questionId]: selectedKey
     }));
+    setCheckingQuestionId(questionId);
+
+    try {
+      const result = await checkQuizAnswer(quizId, questionId, selectedKey);
+      setAnswerResults(prev => ({ ...prev, [questionId]: result }));
+    } catch (error) {
+      setAnswers(prev => {
+        const nextAnswers = { ...prev };
+        delete nextAnswers[questionId];
+        return nextAnswers;
+      });
+      toast.error("Không thể kiểm tra đáp án. Vui lòng chọn lại.");
+    } finally {
+      setCheckingQuestionId(null);
+    }
   };
 
   const goToQuestion = (idx) => {
@@ -224,6 +243,8 @@ function QuizPage() {
             <QuestionCard 
               question={currentQuestion} 
               currentAnswer={answers[currentQuestion.id]} 
+              answerResult={answerResults[currentQuestion.id]}
+              isChecking={checkingQuestionId === currentQuestion.id}
               onSelectAnswer={handleSelectAnswer} 
             />
 

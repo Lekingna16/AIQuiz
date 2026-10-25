@@ -1,9 +1,87 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, File, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { uploadDocument } from "../services/api";
+import { getQuizFilters, uploadDocument } from "../services/api";
+
+const normalizeForSearch = (value) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("vi-VN")
+  .replace(/đ/g, "d")
+  .replace(/\bdh\b/g, "dai hoc")
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim();
+
+const SearchableSelect = ({ id, label, placeholder, options, value, onSelect, disabled, allowCustom = false }) => {
+  const [query, setQuery] = useState(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const trimmedQuery = query.trim();
+  const queryTokens = normalizeForSearch(query).split(" ").filter(Boolean);
+  const suggestions = queryTokens.length > 0
+    ? options.filter((option) => {
+        const normalizedOption = normalizeForSearch(option);
+        return queryTokens.every((token) => normalizedOption.includes(token));
+      }).slice(0, 8)
+    : options.slice(0, 8);
+  const isKnownOption = options.some((option) => option === trimmedQuery);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  const selectOption = (option) => {
+    setQuery(option);
+    onSelect(option);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="form-group autocomplete-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="autocomplete-control">
+        <input
+          id={id}
+          type="search"
+          value={query}
+          placeholder={placeholder}
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-invalid={Boolean(query && !value)}
+          disabled={disabled}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            setQuery(nextValue);
+            onSelect(allowCustom ? nextValue.trim() : "");
+            setIsOpen(true);
+          }}
+        />
+        {isOpen && !disabled && (
+          <ul className="autocomplete-menu" role="listbox">
+            {suggestions.length > 0 ? suggestions.map((option) => (
+              <li key={option} role="option" aria-selected={option === value}>
+                <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectOption(option)}>
+                  {option}
+                </button>
+              </li>
+            )) : <li className="autocomplete-empty">Không tìm thấy kết quả</li>}
+            {allowCustom && trimmedQuery && !isKnownOption && (
+              <li role="option" aria-selected={value === trimmedQuery}>
+                <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectOption(trimmedQuery)}>
+                  Dùng “{trimmedQuery}” (học phần mới)
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const FileUpload = ({ forcedMode }) => {
   const [file, setFile] = useState(null);
@@ -13,12 +91,45 @@ const FileUpload = ({ forcedMode }) => {
   const [language, setLanguage] = useState("vi");
   const [mode, setMode] = useState(forcedMode || "generate");
   const [isPublic, setIsPublic] = useState(false);
+  const [major, setMajor] = useState("");
+  const [subject, setSubject] = useState("");
+  const [examType, setExamType] = useState("");
+  const [metadataOptions, setMetadataOptions] = useState({
+    majors: [],
+    courses_by_major: {},
+    exam_types: [],
+  });
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
   
   const navigate = useNavigate();
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMetadataOptions = async () => {
+      try {
+        const options = await getQuizFilters({ includeCatalog: true });
+        if (isMounted) {
+          setMetadataOptions({
+            majors: options.majors || [],
+            courses_by_major: options.courses_by_major || {},
+            exam_types: options.exam_types || [],
+          });
+        }
+      } catch (error) {
+        console.error("Unable to load upload metadata options", error);
+      } finally {
+        if (isMounted) setIsLoadingMetadata(false);
+      }
+    };
+
+    loadMetadataOptions();
+    return () => { isMounted = false; };
+  }, []);
+
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
     if (rejectedFiles.length > 0) {
-      toast.error("File không hợp lệ. Vui lòng chọn PDF, DOCX hoặc TXT dưới 10MB.");
+      toast.error("File không hợp lệ. Vui lòng chọn PDF, DOCX hoặc TXT dưới 50MB.");
       return;
     }
     if (acceptedFiles.length > 0) {
@@ -33,7 +144,7 @@ const FileUpload = ({ forcedMode }) => {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
       "text/plain": [".txt"],
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 50 * 1024 * 1024, // 50MB
     multiple: false,
   });
 
@@ -56,6 +167,9 @@ const FileUpload = ({ forcedMode }) => {
           language: language,
           mode: mode,
           is_public: isPublic,
+          major: major,
+          subject: subject,
+          exam_type: examType,
         },
         // Upload progress callback
         (percent) => {
@@ -102,7 +216,7 @@ const FileUpload = ({ forcedMode }) => {
               errorMsg = "File không hợp lệ. Vui lòng kiểm tra định dạng và thử lại.";
               break;
             case 413:
-              errorMsg = "File quá lớn. Vui lòng chọn file nhỏ hơn 10MB.";
+              errorMsg = "File quá lớn. Vui lòng chọn file nhỏ hơn 50MB.";
               break;
             case 422:
               errorMsg = "Không thể trích xuất nội dung từ file. Vui lòng thử file khác.";
@@ -209,6 +323,50 @@ const FileUpload = ({ forcedMode }) => {
 
 
       {/* Khu vực Dropzone */}
+      <div className="quiz-config upload-metadata" aria-label="Upload metadata">
+        <div className="form-group">
+          <label htmlFor="upload-major">Ngành học</label>
+          <select
+            id="upload-major"
+            value={major}
+            onChange={(event) => {
+              setMajor(event.target.value);
+              setSubject("");
+            }}
+            disabled={isUploading || isLoadingMetadata}
+          >
+            <option value="" disabled>Chọn ngành học</option>
+            {metadataOptions.majors.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="upload-exam-type">Kỳ thi</label>
+          <select
+            id="upload-exam-type"
+            value={examType}
+            onChange={(e) => setExamType(e.target.value)}
+            disabled={isUploading || isLoadingMetadata}
+          >
+            <option value="" disabled>Chọn kỳ thi</option>
+            {metadataOptions.exam_types.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </div>
+        <SearchableSelect
+          id="upload-subject"
+          label="Học phần"
+          placeholder={major ? "Chọn hoặc nhập học phần mới" : "Chọn ngành học trước"}
+          options={major ? (metadataOptions.courses_by_major[major] || []) : []}
+          value={subject}
+          onSelect={setSubject}
+          allowCustom
+          disabled={isUploading || isLoadingMetadata || !major}
+        />
+      </div>
+
       <div 
         {...getRootProps()} 
         className={`dropzone ${isDragActive ? "active" : ""} ${file ? "has-file" : ""} ${isUploading ? "disabled" : ""}`}
@@ -234,7 +392,7 @@ const FileUpload = ({ forcedMode }) => {
             <p className="dropzone-text">
               {isDragActive ? "Thả file vào đây..." : "Kéo thả file vào đây hoặc click để chọn"}
             </p>
-            <span className="dropzone-hint">PDF, DOCX, TXT — Tối đa 10MB</span>
+            <span className="dropzone-hint">PDF, DOCX, TXT — Tối đa 50MB</span>
           </div>
         )}
       </div>
@@ -281,7 +439,7 @@ const FileUpload = ({ forcedMode }) => {
       <button 
         className="btn btn-primary upload-btn" 
         onClick={handleUpload} 
-        disabled={!file || isUploading}
+        disabled={!file || isUploading || isLoadingMetadata || !major || !subject || !examType}
       >
         {isUploading ? (
           <>

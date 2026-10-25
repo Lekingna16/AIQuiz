@@ -64,7 +64,7 @@ class Settings(BaseSettings):
 
     # --- File Upload ---
     # Giới hạn kích thước file upload (đơn vị: MB)
-    MAX_FILE_SIZE_MB: int = 10
+    MAX_FILE_SIZE_MB: int = 50
 
     # --- Authentication ---
     # Google OAuth2 Client ID

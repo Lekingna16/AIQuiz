@@ -1,7 +1,7 @@
 """Clear generated quiz content while preserving user accounts.
 
 Run ``python scripts/clear_quiz_data.py --confirm`` from ``backend`` only
-when the generated documents, quizzes, questions, attempts, and comments are
+when the generated documents, quizzes, questions, and attempts are
 intentionally being reset.
 """
 
@@ -13,7 +13,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import get_settings
 
 
-COLLECTIONS = ("documents", "quizzes", "questions", "quiz_attempts", "comments")
+COLLECTIONS = ("documents", "quizzes", "questions", "quiz_attempts")
 
 
 async def clear_quiz_data(confirm: bool) -> None:

@@ -13,15 +13,16 @@
  * → SEO friendly hơn (nếu cần SSR sau này)
  */
 
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 
-import HomePage from "./pages/HomePage";
-import QuizPage from "./pages/QuizPage";
-import HistoryPage from "./pages/HistoryPage";
-import UploadPage from "./pages/UploadPage";
-import GeneratePage from "./pages/GeneratePage";
-import AttemptPage from "./pages/AttemptPage";
+const HomePage = lazy(() => import("./views/HomePage"));
+const QuizPage = lazy(() => import("./views/QuizPage"));
+const HistoryPage = lazy(() => import("./views/HistoryPage"));
+const UploadPage = lazy(() => import("./views/UploadPage"));
+const GeneratePage = lazy(() => import("./views/GeneratePage"));
+const AttemptPage = lazy(() => import("./views/AttemptPage"));
 
 import Header from "./components/Header";
 
@@ -49,14 +50,16 @@ function App() {
       <Header />
 
       <main className="app-container">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/upload" element={<UploadPage />} />
-          <Route path="/generate" element={<GeneratePage />} />
-          <Route path="/quiz/:quizId" element={<QuizPage />} />
-          <Route path="/attempt/:attemptId" element={<AttemptPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-        </Routes>
+        <Suspense fallback={<div className="loading-container">Đang tải trang...</div>}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/generate" element={<GeneratePage />} />
+            <Route path="/quiz/:quizId" element={<QuizPage />} />
+            <Route path="/attempt/:attemptId" element={<AttemptPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+          </Routes>
+        </Suspense>
       </main>
     </BrowserRouter>
   );

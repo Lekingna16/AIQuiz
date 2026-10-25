@@ -65,6 +65,18 @@ class Database:
         # Nếu MongoDB không chạy → raise exception → app không start
         try:
             await cls.client.admin.command("ping")
+            # Public quiz listing and its filters are the most frequently loaded
+            # views.  These indexes keep the home page queries selective as the
+            # collection grows.
+            await cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("created_at", -1),
+            ])
+            await cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("subject", 1), ("created_at", -1),
+            ])
+            await cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("exam_type", 1), ("created_at", -1),
+            ])
             print(f"[OK] Connected to MongoDB: {settings.MONGODB_DB_NAME}")
         except Exception as e:
             print(f"[ERROR] MongoDB connection failed: {e}")

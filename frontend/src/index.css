@@ -516,6 +516,12 @@ a:hover {
   gap: var(--spacing-md);
 }
 
+/* Keep autocomplete menus above the file dropzone that follows the form. */
+.upload-metadata {
+  position: relative;
+  z-index: 2;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -561,6 +567,8 @@ a:hover {
 }
 
 .dropzone {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -686,6 +694,62 @@ a:hover {
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
+}
+
+.autocomplete-control {
+  position: relative;
+}
+
+.autocomplete-field {
+  position: relative;
+  z-index: 3;
+}
+
+.autocomplete-control input {
+  width: 100%;
+}
+
+.autocomplete-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--spacing-xs);
+  list-style: none;
+  /* The card token is translucent in the light theme, which made text from
+     the dropzone behind this menu bleed through. */
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.autocomplete-menu button {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-sm);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.autocomplete-menu button:hover,
+.autocomplete-menu button:focus-visible {
+  background: rgba(124, 58, 237, 0.12);
+  outline: none;
+}
+
+.autocomplete-empty {
+  padding: var(--spacing-sm);
+  color: var(--color-text-muted);
 }
 
 .spinner {
@@ -1127,6 +1191,60 @@ a:hover {
 .option-btn.selected .option-key {
   background: var(--color-primary);
   color: white;
+}
+
+.option-btn:disabled {
+  cursor: default;
+}
+
+.option-btn.correct,
+.option-btn.correct:hover {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: var(--color-success);
+}
+
+.option-btn.incorrect,
+.option-btn.incorrect:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: var(--color-error);
+}
+
+.option-btn.correct .option-key {
+  background: var(--color-success);
+  color: white;
+}
+
+.option-btn.incorrect .option-key {
+  background: var(--color-error);
+  color: white;
+}
+
+.answer-feedback {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border: 1px solid;
+  border-radius: var(--radius-md);
+}
+
+.answer-feedback.correct {
+  color: var(--color-success);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--color-success);
+}
+
+.answer-feedback.incorrect {
+  color: var(--color-error);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--color-error);
+}
+
+.answer-feedback.checking {
+  color: var(--color-text-secondary);
+}
+
+.answer-feedback p {
+  margin: var(--spacing-sm) 0 0;
+  color: var(--color-text-primary);
 }
 
 /* --- Results Summary --- */

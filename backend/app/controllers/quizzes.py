@@ -16,10 +16,13 @@ import math
 from datetime import datetime, timezone
 
 from app.database import get_db
+from app.education_catalog import EXAM_TYPES, SUBJECTS
+from app.services.education_catalog_service import get_courses_by_major
 from app.models.quiz import (
     QuizResponse,
     QuizSummaryResponse,
     QuizSubmitRequest,
+    AnswerCheckRequest,
     QuizSubmitResponse,
     QuestionResponse,
     AnswerResult,
@@ -40,21 +43,31 @@ router = APIRouter(
     summary="Get filter options",
     description="Lấy danh sách các môn học, chương, trường đang có trong database (public).",
 )
-async def get_quiz_filters(db: AsyncIOMotorDatabase = Depends(get_db)):
-    # Base query: public and approved
+async def get_quiz_filters(
+    include_catalog: bool = Query(default=False),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Return small home-page filters, or the full upload catalogue on demand."""
     query = {"is_public": True, "is_approved": True}
-    
-    # Lấy các giá trị distinct cho từng trường
-    subjects = await db.quizzes.distinct("subject", query)
-    schools = await db.quizzes.distinct("school", query)
-    
-    # Loại bỏ các giá trị None/rỗng
-    subjects = [s for s in subjects if s]
-    schools = [s for s in schools if s]
-    
+
+    if not include_catalog:
+        subjects = await db.quizzes.distinct("subject", query)
+        return {
+            "subjects": sorted((subject for subject in subjects if subject), key=str.casefold),
+            "exam_types": EXAM_TYPES,
+        }
+
+    courses_by_major = await get_courses_by_major(db)
+    subjects = list(dict.fromkeys(SUBJECTS + [
+        course
+        for courses in courses_by_major.values()
+        for course in courses
+    ]))
     return {
-        "subjects": sorted(subjects),
-        "schools": sorted(schools),
+        "subjects": [subject for subject in subjects if subject],
+        "majors": sorted(courses_by_major, key=str.casefold),
+        "courses_by_major": courses_by_major,
+        "exam_types": EXAM_TYPES,
     }
 
 @router.get(
@@ -100,6 +113,7 @@ async def list_quizzes(
             "total_questions": q["total_questions"],
             "difficulty": q["difficulty"],
             "subject": q.get("subject"),
+            "major": q.get("major"),
             "exam_type": q.get("exam_type"),
             "school": q.get("school"),
             "created_at": q["created_at"].isoformat(),
@@ -142,6 +156,7 @@ async def get_my_quizzes(
             "total_questions": q["total_questions"],
             "difficulty": q["difficulty"],
             "subject": q.get("subject"),
+            "major": q.get("major"),
             "exam_type": q.get("exam_type"),
             "school": q.get("school"),
             "is_public": q.get("is_public", False),
@@ -184,6 +199,7 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
         "total_questions": quiz["total_questions"],
         "difficulty": quiz["difficulty"],
         "subject": quiz.get("subject"),
+        "major": quiz.get("major"),
         "exam_type": quiz.get("exam_type"),
         "school": quiz.get("school"),
         "created_at": quiz["created_at"].isoformat(),
@@ -196,6 +212,39 @@ async def get_quiz(quiz_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
             }
             for q in questions
         ]
+    }
+
+
+@router.post(
+    "/{quiz_id}/questions/{question_id}/check",
+    response_model=AnswerResult,
+    summary="Check one answer immediately",
+    description="Chấm một lựa chọn và trả đáp án đúng ngay sau khi người dùng chọn.",
+)
+async def check_quiz_answer(
+    quiz_id: str,
+    question_id: str,
+    payload: AnswerCheckRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Return feedback for a single answer without creating a quiz attempt."""
+    if not ObjectId.is_valid(quiz_id) or not ObjectId.is_valid(question_id):
+        raise HTTPException(status_code=400, detail="Invalid quiz or question ID")
+
+    question = await db.questions.find_one({
+        "_id": ObjectId(question_id),
+        "quiz_id": quiz_id,
+    })
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found in this quiz")
+
+    correct_answer = question.get("correct_answer", "")
+    return {
+        "question_id": question_id,
+        "selected": payload.selected,
+        "correct_answer": correct_answer,
+        "is_correct": payload.selected == correct_answer,
+        "explanation": question.get("explanation", ""),
     }
 
 

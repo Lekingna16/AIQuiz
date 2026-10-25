@@ -115,6 +115,7 @@ class QuizInDB(BaseModel):
     difficulty: Difficulty = Field(default=Difficulty.MIXED)
     language: str = Field(default="vi")
     subject: str | None = Field(default=None, description="Môn học")
+    major: str | None = Field(default=None, description="Ngành học")
     exam_type: str | None = Field(default=None, description="Thi giữa kì/cuối kì")
     school: str | None = Field(default=None, description="Trường")
     is_public: bool = Field(default=False, description="Công khai cho người khác làm")
@@ -134,6 +135,7 @@ class QuizResponse(BaseModel):
     total_questions: int
     difficulty: Difficulty
     subject: str | None = None
+    major: str | None = None
     exam_type: str | None = None
     school: str | None = None
     is_public: bool = False
@@ -150,6 +152,7 @@ class QuizSummaryResponse(BaseModel):
     total_questions: int
     difficulty: Difficulty
     subject: str | None = None
+    major: str | None = None
     exam_type: str | None = None
     school: str | None = None
     is_public: bool = False
@@ -165,6 +168,11 @@ class QuizSummaryResponse(BaseModel):
 class AnswerSubmission(BaseModel):
     """1 câu trả lời user submit."""
     question_id: str
+    selected: str = Field(..., pattern=r"^[A-D]$")
+
+
+class AnswerCheckRequest(BaseModel):
+    """A single answer used for immediate feedback while taking a quiz."""
     selected: str = Field(..., pattern=r"^[A-D]$")
 
 

@@ -22,7 +22,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "https://aiquiz-hla0.onrend
 // Tạo axios instance với config chung
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 600000, // 600 giây (10 phút) để xử lý file lớn
+  // Normal API calls should fail quickly instead of leaving the UI blocked.
+  // Uploads override this with their own 10-minute timeout below.
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -103,7 +105,7 @@ api.interceptors.response.use(
 /**
  * Upload file và sinh quiz
  * @param {File} file - File PDF/DOCX/TXT
- * @param {Object} options - { num_questions, difficulty, language }
+ * @param {Object} options - { num_questions, difficulty, language, major, subject, exam_type, school }
  * @returns {Promise} Quiz data
  */
 export const uploadDocument = async (file, options = {}, onProgress = null) => {
@@ -118,6 +120,10 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
   if (options.language) params.append("language", options.language);
   if (options.mode) params.append("mode", options.mode);
   if (options.is_public !== undefined) params.append("is_public", options.is_public);
+  if (options.subject) params.append("subject", options.subject);
+  if (options.major) params.append("major", options.major);
+  if (options.exam_type) params.append("exam_type", options.exam_type);
+  if (options.school) params.append("school", options.school);
 
   const response = await api.post(
     `/api/documents/upload?${params.toString()}`,
@@ -143,8 +149,10 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
 /**
  * Lấy các tuỳ chọn bộ lọc (dropdown)
  */
-export const getQuizFilters = async () => {
-  const response = await api.get("/api/quizzes/filters");
+export const getQuizFilters = async ({ includeCatalog = false } = {}) => {
+  const response = await api.get("/api/quizzes/filters", {
+    params: includeCatalog ? { include_catalog: true } : undefined,
+  });
   return response.data;
 };
 
@@ -197,6 +205,14 @@ export const submitQuiz = async (quizId, answers) => {
   return response.data;
 };
 
+/** Chấm ngay một đáp án khi người dùng chọn. */
+export const checkQuizAnswer = async (quizId, questionId, selected) => {
+  const response = await api.post(`/api/quizzes/${quizId}/questions/${questionId}/check`, {
+    selected,
+  });
+  return response.data;
+};
+
 /**
  * Lấy lịch sử làm bài của user
  */
@@ -237,22 +253,6 @@ export const loginMock = async () => {
  */
 export const getMe = async () => {
   const response = await api.get('/api/auth/me');
-  return response.data;
-};
-
-/**
- * Lấy danh sách comments của một câu hỏi
- */
-export const getComments = async (questionId) => {
-  const response = await api.get(`/api/comments/question/${questionId}`);
-  return response.data;
-};
-
-/**
- * Thêm comment mới
- */
-export const addComment = async (questionId, data) => {
-  const response = await api.post(`/api/comments/question/${questionId}`, data);
   return response.data;
 };
 

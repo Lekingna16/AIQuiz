@@ -82,6 +82,7 @@ class QuizService:
         mode: str = "generate",
         user_id: str | None = None,
         subject: str | None = None,
+        major: str | None = None,
         exam_type: str | None = None,
         school: str | None = None,
         is_public: bool = False,
@@ -303,9 +304,10 @@ class QuizService:
                     difficulty=difficulty,
                     language=language,
                     user_id=user_id,
-                    subject=q_data.get("subject"),
-                    exam_type=q_data.get("exam_type"),
-                    school=q_data.get("school"),
+                    subject=subject,
+                    major=major,
+                    exam_type=exam_type,
+                    school=school,
                     is_public=True, # Tự động public và approved
                 )
                 saved_quiz_ids.append(qid)
@@ -508,6 +510,7 @@ Return ONLY a valid JSON object matching this structure:
         language: str,
         user_id: str | None,
         subject: str | None,
+        major: str | None,
         exam_type: str | None,
         school: str | None,
         is_public: bool,
@@ -527,6 +530,7 @@ Return ONLY a valid JSON object matching this structure:
             "difficulty": difficulty,
             "language": language,
             "subject": subject,
+            "major": major,
             "exam_type": exam_type,
             "school": school,
             "is_public": is_public,
@@ -597,6 +601,7 @@ Return ONLY a valid JSON object matching this structure:
                 "description": quiz.get("description", ""),
                 "total_questions": quiz["total_questions"],
                 "difficulty": quiz["difficulty"],
+                "major": quiz.get("major"),
                 "created_at": quiz["created_at"].isoformat(),
                 "questions": [
                     {
