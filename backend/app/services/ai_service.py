@@ -32,7 +32,7 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
+    retry_if_exception,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,24 @@ class QuizGenerationError(DeepSeekServiceError):
 class APIConnectionError(DeepSeekServiceError):
     """Lỗi kết nối tới DeepSeek API."""
     pass
+
+
+class QuotaExceededError(APIConnectionError):
+    """The provider explicitly rejected the call because its quota is exhausted."""
+    pass
+
+
+def _is_quota_error(error: Exception) -> bool:
+    status_code = getattr(error, "status_code", None)
+    message = str(error).upper()
+    return status_code == 429 or "ERROR CODE: 429" in message or "RESOURCE_EXHAUSTED" in message
+
+
+def _should_retry_ai_error(error: Exception) -> bool:
+    return (
+        isinstance(error, (json.JSONDecodeError, QuizGenerationError, APIConnectionError))
+        and not isinstance(error, QuotaExceededError)
+    )
 
 
 class DeepSeekService:
@@ -355,7 +373,7 @@ Return ONLY a valid JSON object matching this structure:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=15),
-        retry=retry_if_exception_type(APIConnectionError),
+        retry=retry_if_exception(_should_retry_ai_error),
         reraise=True,
     )
     async def _call_vision_ocr(self, content: list[dict]) -> str:
@@ -380,16 +398,14 @@ Return ONLY a valid JSON object matching this structure:
         except (QuizGenerationError, APIConnectionError):
             raise
         except Exception as exc:
+            if _is_quota_error(exc):
+                raise QuotaExceededError(f"Gemini OCR quota exceeded: {str(exc)}") from exc
             raise APIConnectionError(f"Gemini OCR error: {str(exc)}") from exc
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=15),
-        retry=retry_if_exception_type((
-            json.JSONDecodeError,
-            QuizGenerationError,
-            APIConnectionError,
-        )),
+        retry=retry_if_exception(_should_retry_ai_error),
         reraise=True,
     )
     async def _call_api_with_retry(self, system_prompt: str, text: str, skip_validation: bool = False) -> str:
@@ -451,6 +467,8 @@ Return ONLY a valid JSON object matching this structure:
             # Re-raise known errors, wrap unknown ones
             if isinstance(e, (QuizGenerationError, APIConnectionError, json.JSONDecodeError)):
                 raise
+            if _is_quota_error(e):
+                raise QuotaExceededError(f"{self.provider_name} API quota exceeded: {str(e)}") from e
             raise APIConnectionError(f"{self.provider_name} API error: {str(e)}")
 
     def _parse_response(self, text: str) -> dict:
@@ -572,3 +590,43 @@ Return ONLY a valid JSON object matching this structure:
                         f"Question {i + 1}, Option {opt.get('key')}: "
                         f"text is empty"
                     )
+
+
+class FailoverAIService:
+    """Switch from a quota-exhausted primary provider to a configured fallback."""
+
+    def __init__(self, primary: DeepSeekService, fallback: DeepSeekService):
+        self.primary = primary
+        self.fallback = fallback
+        self.active = primary
+
+    async def _invoke(self, method_name: str, *args, **kwargs):
+        method = getattr(self.active, method_name)
+        try:
+            return await method(*args, **kwargs)
+        except QuotaExceededError:
+            if self.active is self.fallback:
+                raise
+            logger.warning(
+                "AI quota exhausted for %s; switching this job to %s",
+                self.primary.provider_name,
+                self.fallback.provider_name,
+            )
+            self.active = self.fallback
+            return await getattr(self.active, method_name)(*args, **kwargs)
+
+    async def generate_quiz(self, *args, **kwargs) -> dict:
+        return await self._invoke("generate_quiz", *args, **kwargs)
+
+    async def extract_metadata(self, *args, **kwargs) -> dict:
+        return await self._invoke("extract_metadata", *args, **kwargs)
+
+    async def transcribe_scanned_pdf(self, *args, **kwargs) -> str:
+        try:
+            return await self.primary.transcribe_scanned_pdf(*args, **kwargs)
+        except QuotaExceededError as exc:
+            # The current DeepSeek text endpoint is not a replacement for
+            # Gemini Vision OCR. Do not pretend a scan was transcribed.
+            raise QuizGenerationError(
+                "PDF scan cần Gemini Vision để OCR; Gemini hiện đã hết quota."
+            ) from exc

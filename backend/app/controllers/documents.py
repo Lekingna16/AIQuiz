@@ -30,6 +30,7 @@ from app.models.user import UserResponse
 from app.dependencies import get_current_user, get_current_user_optional
 from app.services.ai_service import (
     DeepSeekService,
+    FailoverAIService,
     DeepSeekServiceError,
     QuizGenerationError,
     APIConnectionError,
@@ -89,16 +90,23 @@ def _get_file_extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower()
 
 
-def _create_ai_service(settings) -> DeepSeekService:
+def _create_ai_service(settings) -> DeepSeekService | FailoverAIService:
     """Build the configured OpenAI-compatible generation client."""
     provider = getattr(settings, "AI_PROVIDER", "deepseek").strip().lower()
     if provider == "gemini":
-        return DeepSeekService(
+        primary = DeepSeekService(
             api_key=getattr(settings, "GEMINI_API_KEY", None),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             model=getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash"),
             provider_name="Gemini",
         )
+        fallback_key = getattr(settings, "DEEPSEEK_API_KEY", None)
+        if fallback_key and not fallback_key.startswith("your_"):
+            return FailoverAIService(
+                primary=primary,
+                fallback=DeepSeekService(api_key=fallback_key),
+            )
+        return primary
 
     return DeepSeekService(api_key=getattr(settings, "DEEPSEEK_API_KEY", None))
 

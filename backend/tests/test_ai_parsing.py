@@ -8,12 +8,15 @@ Sử dụng mock cho API calls.
 """
 
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from app.services.ai_service import (
     DeepSeekService,
+    FailoverAIService,
+    QuotaExceededError,
     QuizGenerationError,
 )
 
@@ -260,3 +263,22 @@ class TestDeepSeekServiceInit:
         """Test reject empty API key."""
         with pytest.raises(ValueError, match="Invalid DeepSeek API key"):
             DeepSeekService(api_key="")
+
+
+@pytest.mark.asyncio
+async def test_failover_uses_deepseek_after_gemini_quota_exhaustion():
+    primary = SimpleNamespace(
+        provider_name="Gemini",
+        generate_quiz=AsyncMock(side_effect=QuotaExceededError("quota exhausted")),
+    )
+    fallback = SimpleNamespace(
+        provider_name="DeepSeek",
+        generate_quiz=AsyncMock(return_value={"questions": []}),
+    )
+    service = FailoverAIService(primary=primary, fallback=fallback)
+
+    result = await service.generate_quiz(text="source")
+
+    assert result == {"questions": []}
+    assert service.active is fallback
+    fallback.generate_quiz.assert_awaited_once_with(text="source")
