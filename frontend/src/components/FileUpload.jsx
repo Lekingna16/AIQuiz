@@ -14,7 +14,17 @@ const normalizeForSearch = (value) => value
   .replace(/[^a-z0-9]+/g, " ")
   .trim();
 
-const SearchableSelect = ({ id, label, placeholder, options, value, onSelect, disabled, allowCustom = false }) => {
+const SearchableSelect = ({
+  id,
+  label,
+  placeholder,
+  options,
+  value,
+  onSelect,
+  disabled,
+  allowCustom = false,
+  customOptionLabel = "mục mới",
+}) => {
   const [query, setQuery] = useState(value);
   const [isOpen, setIsOpen] = useState(false);
   const trimmedQuery = query.trim();
@@ -72,7 +82,7 @@ const SearchableSelect = ({ id, label, placeholder, options, value, onSelect, di
             {allowCustom && trimmedQuery && !isKnownOption && (
               <li role="option" aria-selected={value === trimmedQuery}>
                 <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectOption(trimmedQuery)}>
-                  Dùng “{trimmedQuery}” (học phần mới)
+                  Dùng “{trimmedQuery}” ({customOptionLabel})
                 </button>
               </li>
             )}
@@ -324,23 +334,20 @@ const FileUpload = ({ forcedMode }) => {
 
       {/* Khu vực Dropzone */}
       <div className="quiz-config upload-metadata" aria-label="Upload metadata">
-        <div className="form-group">
-          <label htmlFor="upload-major">Ngành học</label>
-          <select
-            id="upload-major"
-            value={major}
-            onChange={(event) => {
-              setMajor(event.target.value);
-              setSubject("");
-            }}
-            disabled={isUploading || isLoadingMetadata}
-          >
-            <option value="" disabled>Chọn ngành học</option>
-            {metadataOptions.majors.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </div>
+        <SearchableSelect
+          id="upload-major"
+          label="Ngành học"
+          placeholder="Chọn hoặc nhập ngành học mới"
+          options={metadataOptions.majors}
+          value={major}
+          onSelect={(nextMajor) => {
+            setMajor(nextMajor);
+            setSubject("");
+          }}
+          allowCustom
+          customOptionLabel="ngành học mới"
+          disabled={isUploading || isLoadingMetadata}
+        />
         <div className="form-group">
           <label htmlFor="upload-exam-type">Kỳ thi</label>
           <select
@@ -363,6 +370,7 @@ const FileUpload = ({ forcedMode }) => {
           value={subject}
           onSelect={setSubject}
           allowCustom
+          customOptionLabel="học phần mới"
           disabled={isUploading || isLoadingMetadata || !major}
         />
       </div>

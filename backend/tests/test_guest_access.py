@@ -23,7 +23,7 @@ async def test_upload_catalog_returns_major_specific_course_suggestions():
 
 
 @pytest.mark.asyncio
-async def test_guest_upload_creates_an_unowned_quiz(monkeypatch):
+async def test_guest_upload_accepts_a_custom_major(monkeypatch):
     service = MagicMock()
     service.upload_and_generate_quiz = AsyncMock(
         return_value={"document_id": "document-id", "quiz": {"id": "quiz-id"}}
@@ -46,7 +46,7 @@ async def test_guest_upload_creates_an_unowned_quiz(monkeypatch):
         mode="generate",
         is_public=True,
         subject="Y học hàng không",
-        major="Y khoa",
+        major="Ngành liên ngành mới",
         exam_type="Cuối kỳ",
         current_user=None,
         db=MagicMock(),
@@ -55,6 +55,6 @@ async def test_guest_upload_creates_an_unowned_quiz(monkeypatch):
     assert result["quiz"]["id"] == "quiz-id"
     assert service.upload_and_generate_quiz.await_args.kwargs["user_id"] is None
     assert service.upload_and_generate_quiz.await_args.kwargs["subject"] == "Y học hàng không"
-    assert service.upload_and_generate_quiz.await_args.kwargs["major"] == "Y khoa"
+    assert service.upload_and_generate_quiz.await_args.kwargs["major"] == "Ngành liên ngành mới"
     assert service.upload_and_generate_quiz.await_args.kwargs["exam_type"] == "Cuối kỳ"
     assert service.upload_and_generate_quiz.await_args.kwargs["school"] is None

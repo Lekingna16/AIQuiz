@@ -23,7 +23,6 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.config import get_settings
 from app.database import get_db
 from app.education_catalog import EXAM_TYPES
-from app.services.education_catalog_service import is_known_major
 from app.models.document import DocumentResponse
 from app.models.quiz import QuizResponse, Difficulty
 from app.models.user import UserResponse
@@ -273,10 +272,10 @@ async def upload_document(
     exam_type = exam_type.strip()
     school = school.strip() if school else None
 
-    if not await is_known_major(db, major) or exam_type not in EXAM_TYPES:
+    if exam_type not in EXAM_TYPES:
         raise HTTPException(
             status_code=422,
-            detail="Major and exam type must be selected from the provided catalog.",
+            detail="Exam type must be selected from the provided catalog.",
         )
 
     # =====================
