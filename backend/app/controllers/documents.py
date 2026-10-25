@@ -97,6 +97,20 @@ def _get_file_extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower()
 
 
+def _create_ai_service(settings) -> DeepSeekService:
+    """Build the configured OpenAI-compatible generation client."""
+    provider = getattr(settings, "AI_PROVIDER", "deepseek").strip().lower()
+    if provider == "gemini":
+        return DeepSeekService(
+            api_key=getattr(settings, "GEMINI_API_KEY", None),
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            model=getattr(settings, "GEMINI_MODEL", "gemini-3.8-flash"),
+            provider_name="Gemini",
+        )
+
+    return DeepSeekService(api_key=getattr(settings, "DEEPSEEK_API_KEY", None))
+
+
 def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:
     """
     Validate file upload.
@@ -301,7 +315,7 @@ async def upload_document(
     # Step 3: Initialize services & run pipeline
     # =====================
     try:
-        ai_service = DeepSeekService(api_key=settings.DEEPSEEK_API_KEY)
+        ai_service = _create_ai_service(settings)
         quiz_service = QuizService(db=db, gemini_service=ai_service)
 
         result = await _generate_in_available_slot(

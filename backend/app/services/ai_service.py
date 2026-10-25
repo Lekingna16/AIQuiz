@@ -151,25 +151,32 @@ class DeepSeekService:
     }
     """
 
-    def __init__(self, api_key: str):
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        base_url: str = "https://api.deepseek.com",
+        model: str = "deepseek-chat",
+        provider_name: str = "DeepSeek",
+    ):
         """
         Khởi tạo DeepSeek service.
 
         Args:
             api_key: DeepSeek API key từ https://platform.deepseek.com/api_keys
         """
-        if not api_key or api_key == "your_deepseek_api_key_here":
+        if not api_key or api_key.startswith("your_"):
             raise ValueError(
-                "Invalid DeepSeek API key. "
-                "Get your key at: https://platform.deepseek.com/api_keys"
+                f"Invalid {provider_name} API key. Configure it in the server environment."
             )
 
         self.client = OpenAI(
             api_key=api_key,
-            base_url="https://api.deepseek.com",
+            base_url=base_url,
         )
-        self.model = "deepseek-chat"
-        logger.info(f"DeepSeekService initialized with model: {self.model}")
+        self.model = model
+        self.provider_name = provider_name
+        logger.info("AI service initialized: provider=%s, model=%s", provider_name, model)
 
     async def generate_quiz(
         self,
@@ -314,6 +321,7 @@ Return ONLY a valid JSON object matching this structure:
         retry=retry_if_exception_type((
             json.JSONDecodeError,
             QuizGenerationError,
+            APIConnectionError,
         )),
         reraise=True,
     )
@@ -356,7 +364,7 @@ Return ONLY a valid JSON object matching this structure:
 
             content = response.choices[0].message.content
             if not content:
-                raise QuizGenerationError("Empty response from DeepSeek API")
+                raise QuizGenerationError(f"Empty response from {self.provider_name} API")
 
             if skip_validation:
                 # Chỉ check JSON valid, không validate quiz structure
@@ -369,14 +377,14 @@ Return ONLY a valid JSON object matching this structure:
 
         except asyncio.TimeoutError:
             raise APIConnectionError(
-                "DeepSeek API timeout after 90 seconds. "
+                f"{self.provider_name} API timeout after 90 seconds. "
                 "The document might be too long or the API is overloaded."
             )
         except Exception as e:
             # Re-raise known errors, wrap unknown ones
             if isinstance(e, (QuizGenerationError, APIConnectionError, json.JSONDecodeError)):
                 raise
-            raise APIConnectionError(f"DeepSeek API error: {str(e)}")
+            raise APIConnectionError(f"{self.provider_name} API error: {str(e)}")
 
     def _parse_response(self, text: str) -> dict:
         """

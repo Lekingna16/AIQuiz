@@ -60,7 +60,20 @@ class Settings(BaseSettings):
 
     # --- Google Gemini ---
     # API Key lấy từ: https://aistudio.google.com/apikey
-    DEEPSEEK_API_KEY: str
+    # Gemini uses the OpenAI-compatible endpoint. Keep DeepSeek as an
+    # optional fallback so existing deployments continue to start.
+    AI_PROVIDER: str = "deepseek"
+    DEEPSEEK_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+
+    @field_validator("AI_PROVIDER")
+    @classmethod
+    def validate_ai_provider(cls, value: str) -> str:
+        provider = value.strip().lower()
+        if provider not in {"deepseek", "gemini"}:
+            raise ValueError("AI_PROVIDER must be either 'deepseek' or 'gemini'.")
+        return provider
 
     # --- File Upload ---
     # Giới hạn kích thước file upload (đơn vị: MB)
