@@ -346,8 +346,10 @@ Return ONLY a valid JSON object matching this structure:
         instruction = (
             "You are an OCR engine for Vietnamese educational material. "
             "Transcribe every visible word exactly, preserving question numbers, "
-            "answer choices, formulas, and line breaks. Do not summarize, solve, "
-            "translate, or add commentary. Return plain text only."
+            "answer choices A, B, C, D, formulas, and line breaks. Never omit a "
+            "partially visible answer choice. Keep pages separate by writing a line "
+            "in the exact form === PAGE N === before each page. Do not summarize, "
+            "solve, translate, correct, or add commentary. Return plain text only."
         )
         page_texts = []
 

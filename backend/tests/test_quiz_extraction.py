@@ -118,6 +118,25 @@ async def test_quiz_service_never_sends_pending_ocr_segments_to_ai():
 
 
 @pytest.mark.asyncio
+async def test_quiz_service_uses_gemini_vision_for_scan_only_pdf():
+    gemini_mock = MagicMock()
+    gemini_mock.transcribe_scanned_pdf = AsyncMock(
+        return_value="=== PAGE 1 ===\nCâu 1: Nội dung scan?\nA. Một\nB. Hai\nC. Ba\nD. Bốn"
+    )
+    service = QuizService(db=MagicMock(), gemini_service=gemini_mock)
+    service.extractor.is_scan_only_pdf = MagicMock(return_value=True)
+    service.extractor.render_scanned_pdf_pages = MagicMock(return_value=[b"jpeg-page"])
+    service._run_extractor_isolated = AsyncMock()
+
+    final_text = await service._extract_text(b"%PDF-fake", "pdf", "scan.pdf")
+
+    gemini_mock.transcribe_scanned_pdf.assert_awaited_once_with([b"jpeg-page"])
+    service._run_extractor_isolated.assert_not_awaited()
+    assert "Câu 1: Nội dung scan?" in final_text
+    assert "D. Bốn" in final_text
+
+
+@pytest.mark.asyncio
 async def test_quiz_service_runs_real_pdf_ocr_via_subprocess_worker():
     import fitz
 

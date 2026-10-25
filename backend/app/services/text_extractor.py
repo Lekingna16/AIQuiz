@@ -514,6 +514,32 @@ class TextExtractor:
 
         return False
 
+    @classmethod
+    def is_scan_only_pdf(cls, file_bytes: bytes) -> bool:
+        """Kiểm tra PDF có hoàn toàn là ảnh scan hay không.
+
+        Chỉ các file scan hoàn toàn mới được gửi Gemini Vision. PDF có lớp chữ
+        hoặc nội dung hỗn hợp vẫn đi theo parser/OCR cục bộ để không gửi dữ liệu
+        không cần thiết và giữ định dạng gốc.
+        """
+        try:
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            try:
+                if doc.page_count == 0 or (doc.needs_pass and not doc.authenticate("")):
+                    return False
+                for page in doc:
+                    raw_text = page.get_text("text")
+                    meaningful = re.sub(r"[^\wÀ-ỹ]", "", raw_text, flags=re.UNICODE)
+                    # Một số file scan có số trang/watermark thành lớp text rất ngắn.
+                    # Chỉ coi là PDF có text khi trang có đủ nội dung thực sự.
+                    if len(meaningful) >= 40 and not cls.has_damaged_ocr_text(raw_text):
+                        return False
+                return True
+            finally:
+                doc.close()
+        except Exception:
+            return False
+
     def extract(self, file_bytes: bytes, file_type: str) -> str:
         """
         Trích xuất text từ file bytes (đồng bộ, dùng OCR cục bộ nếu có).

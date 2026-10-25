@@ -104,6 +104,7 @@ class QuizService:
         self.db = db
         self.gemini = gemini_service
         settings = get_settings()
+        self.ai_vision_ocr = getattr(settings, "OCR_AI_VISION", True)
         self.extractor = TextExtractor(
             ocr=LocalOCREngine.from_settings(settings),
             ocr_max_pages=getattr(settings, "OCR_MAX_PAGES", None),
@@ -157,13 +158,35 @@ class QuizService:
 
     async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
         """
-        Trích xuất text (kèm OCR cục bộ) cho mọi loại file.
+        Trích xuất text cho mọi loại file.
 
-        1. Đọc file + OCR cục bộ (chạy trong process riêng để tránh giữ GIL
-           gây timeout cho các request polling trạng thái job)
-        2. Ghép + clean text. Không gọi AI để đọc nội dung file; AI chỉ được
-           dùng sau đó để giải đáp án cho các câu đã được parser tách ra.
+        1. PDF scan hoàn toàn → Gemini Vision đọc theo trang (khi được bật).
+        2. Nếu Vision lỗi/quota, dùng OCR cục bộ trong process riêng.
+        3. PDF/DOCX có text layer luôn được parser trực tiếp, không gửi AI.
         """
+        if (
+            self.ai_vision_ocr
+            and file_type.lower().strip() == "pdf"
+            and await asyncio.to_thread(self.extractor.is_scan_only_pdf, file_bytes)
+        ):
+            try:
+                page_images = await asyncio.to_thread(
+                    self.extractor.render_scanned_pdf_pages, file_bytes
+                )
+                vision_text = await self.gemini.transcribe_scanned_pdf(page_images)
+                if vision_text and vision_text.strip():
+                    logger.info(
+                        "%s: Gemini Vision OCR completed for %d scanned pages",
+                        filename, len(page_images),
+                    )
+                    return self.extractor.finalize_text(
+                        ExtractionResult.from_text(vision_text, file_type="pdf")
+                    )
+            except Exception as exc:
+                # Không làm hỏng upload khi Vision tạm lỗi/quota; local OCR vẫn
+                # là dự phòng để người dùng nhận được kết quả thay vì timeout.
+                logger.warning("%s: Gemini Vision OCR failed, using local OCR: %s", filename, exc)
+
         result = await self._run_extractor_isolated(file_bytes, file_type)
 
         pending = result.pending_segments
@@ -171,8 +194,7 @@ class QuizService:
             # Defensive path for custom extractors: production TextExtractor
             # never creates these segments because emit_pending_images=False.
             logger.warning(
-                "%s: %d image(s) were skipped because local OCR is unavailable; "
-                "AI is not used to read uploaded files.",
+                "%s: %d image(s) were skipped because local OCR is unavailable.",
                 filename, len(pending),
             )
 
@@ -229,9 +251,8 @@ class QuizService:
 
             if not extracted_text.strip() and file_type.lower() in {"pdf", "docx"}:
                 raise ValueError(
-                    "Không đọc được chữ từ tài liệu scan. OCR cục bộ tiếng Việt "
-                    "chưa sẵn sàng trên máy chủ; nội dung tải lên không được gửi cho AI. "
-                    "Vui lòng thử file có thể bôi đen/copy chữ hoặc liên hệ quản trị viên."
+                    "Không đọc được chữ từ tài liệu scan. Gemini Vision và OCR cục bộ "
+                    "đều chưa thể xử lý file này; vui lòng thử lại sau."
                 )
 
             # Validate text content
