@@ -110,14 +110,18 @@ allow_methods: HTTP methods được phép (GET, POST, PUT, DELETE)
 allow_headers: Headers được phép gửi
 allow_credentials: cho phép gửi cookies (cần cho auth)
 """
+allowed_origins = list(dict.fromkeys([
+    *(origin.strip().rstrip("/") for origin in settings.FRONTEND_URL.split(",") if origin.strip()),
+    # Production frontend: giữ CORS hoạt động cả khi biến môi trường Render bị
+    # thiếu/sai trong một lần deploy.
+    "https://ai-quiz-blush.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        origin.strip().rstrip("/") for origin in settings.FRONTEND_URL.split(",") if origin.strip()
-    ] + [
-        "http://localhost:5173",  # Backup nếu env chưa set
-        "http://127.0.0.1:5173",  # Handle cases where user visits 127.0.0.1
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],  # Cho phép tất cả methods
     allow_headers=["*"],  # Cho phép tất cả headers

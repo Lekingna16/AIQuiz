@@ -155,14 +155,16 @@ export const getUploadJob = async (jobId) => {
 };
 
 export const waitForUploadJob = async (jobId, onStatus) => {
-  const deadline = Date.now() + (15 * 60 * 1000);
+  const deadline = Date.now() + (20 * 60 * 1000);
   let consecutivePollErrors = 0;
-  const maxConsecutivePollErrors = 6;
+  const maxConsecutivePollErrors = 8;
+  let pollDelayMs = 3000;
 
   while (Date.now() < deadline) {
     try {
       const job = await getUploadJob(jobId);
       consecutivePollErrors = 0;
+      pollDelayMs = 3000;
       onStatus?.(job.status);
 
       if (job.status === "completed") return job;
@@ -173,6 +175,17 @@ export const waitForUploadJob = async (jobId, onStatus) => {
       }
     } catch (error) {
       const status = error.response?.status;
+      if (status === 404) {
+        const jobMissingError = new Error("Upload job not found");
+        jobMissingError.friendlyMessage =
+          "Phiên xử lý tài liệu không còn tồn tại (server vừa khởi động lại hoặc phiên đăng nhập đã thay đổi). Vui lòng tải lại trang và upload lại file.";
+        throw jobMissingError;
+      }
+      if (status === 401 || status === 403) {
+        const authError = new Error("Upload job access denied");
+        authError.friendlyMessage = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi upload file.";
+        throw authError;
+      }
       const isTransient =
         error.code === "ECONNABORTED" ||
         error.code === "ERR_NETWORK" ||
@@ -187,11 +200,16 @@ export const waitForUploadJob = async (jobId, onStatus) => {
 
       consecutivePollErrors += 1;
       if (consecutivePollErrors >= maxConsecutivePollErrors) {
-        throw error;
+        const unavailableError = new Error("Upload job polling unavailable");
+        unavailableError.friendlyMessage =
+          "Máy chủ đang khởi động lại hoặc đang xử lý tài liệu lớn. Hãy chờ ít phút, tải lại trang và kiểm tra Lịch sử; không cần upload lại ngay.";
+        throw unavailableError;
       }
+      // Không dồn nhiều GET lên instance Render nhỏ trong lúc OCR/AI đang chạy.
+      pollDelayMs = Math.min(Math.round(pollDelayMs * 1.5), 12000);
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs));
   }
 
   const error = new Error("Tài liệu vẫn đang được xử lý.");
