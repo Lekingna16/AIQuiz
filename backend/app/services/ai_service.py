@@ -621,6 +621,10 @@ class FailoverAIService:
     async def extract_metadata(self, *args, **kwargs) -> dict:
         return await self._invoke("extract_metadata", *args, **kwargs)
 
+    async def _call_api_with_retry(self, *args, **kwargs) -> str:
+        """Keep the answer-solver path compatible with the failover service."""
+        return await self._invoke("_call_api_with_retry", *args, **kwargs)
+
     async def transcribe_scanned_pdf(self, *args, **kwargs) -> str:
         try:
             return await self.primary.transcribe_scanned_pdf(*args, **kwargs)

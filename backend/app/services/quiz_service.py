@@ -116,9 +116,10 @@ class QuizService:
             extracted_text = self.extractor.extract(file_bytes, file_type)
 
             if not extracted_text.strip() and file_type.lower() == "pdf":
-                logger.info("PDF has no text layer; using Gemini vision OCR")
-                page_images = self.extractor.render_scanned_pdf_pages(file_bytes)
-                extracted_text = await self.gemini.transcribe_scanned_pdf(page_images)
+                raise ValueError(
+                    "PDF này là bản scan không có lớp văn bản. "
+                    "Chế độ trích xuất không dùng AI chỉ hỗ trợ PDF có thể bôi đen/copy chữ."
+                )
 
             # Validate text content
             is_valid, error_msg = self.extractor.validate_extracted_text(extracted_text)
@@ -175,26 +176,10 @@ class QuizService:
                 unique_questions = deduplicate_questions(raw_questions)
                 logger.info(f"After dedup: {len(unique_questions)} unique questions")
 
-                # A non-empty but corrupted PDF text layer used to pass the
-                # extractor validation and leak OCR garbage into the quiz.
-                # Keep the parsed order/count, then repair its visible text.
-                requires_ocr_repair = (
-                    file_type.lower() == "pdf"
-                    and self.extractor.has_damaged_ocr_text(extracted_text)
-                )
-                if requires_ocr_repair:
-                    logger.warning("Detected damaged PDF OCR text; repairing questions")
-
                 if not unique_questions:
-                    logger.warning("Không tìm thấy câu hỏi bằng Regex. Chuyển sang dùng AI (DeepSeek) để nhận diện format động (Fallback)...")
-                    quiz_data = await self.gemini.generate_quiz(
-                        text=processed_text,
-                        num_questions=num_questions,
-                        difficulty=difficulty,
-                        language=language,
-                        mode="extract",
+                    raise ValueError(
+                        "Không tìm thấy câu hỏi trắc nghiệm theo định dạng hỗ trợ trong tài liệu."
                     )
-                    quiz_data_list = [quiz_data]
                 else:
                     # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
                     has_answer = [q for q in unique_questions if q.get("correct_answer")]
@@ -207,17 +192,15 @@ class QuizService:
                     )
 
                     # Chỉ gọi AI cho những câu thực sự thiếu đáp án
-                    questions_to_process = (
-                        unique_questions if requires_ocr_repair else unsolved_questions
-                    )
+                    questions_to_process = unsolved_questions
                     ai_solved = 0
                     if questions_to_process:
                         logger.info(
-                            f"Calling DeepSeek AI to process {len(questions_to_process)} questions..."
+                            f"Calling AI answer solver for {len(questions_to_process)} questions..."
                         )
                         solved_results = await self._solve_missing_answers_with_ai(
                             questions_to_process,
-                            repair_ocr=requires_ocr_repair,
+                            repair_ocr=False,
                         )
                         
                         # Merge solved answers back bằng INDEX (không dùng text matching)
@@ -226,12 +209,6 @@ class QuizService:
                             if solved_q and solved_q is not None:
                                 answer = solved_q.get("correct_answer", "")
                                 explanation = solved_q.get("explanation", "")
-                                if requires_ocr_repair:
-                                    repaired_text = solved_q.get("question_text", "").strip()
-                                    repaired_options = solved_q.get("options", [])
-                                    if repaired_text and self._has_complete_options(repaired_options):
-                                        q["question_text"] = repaired_text
-                                        q["options"] = repaired_options
                                 if answer and answer.upper() in {"A", "B", "C", "D"}:
                                     q["correct_answer"] = answer.upper()
                                     q["explanation"] = explanation
@@ -254,8 +231,6 @@ class QuizService:
                                 "Vui lòng kiểm tra lại."
                             )
 
-                    metadata = await self.gemini.extract_metadata(extracted_text[:3000])
-
                     # Tạo title/description tự động
                     desc_parts = [
                         f"Trích xuất {len(unique_questions)} câu hỏi duy nhất",
@@ -274,7 +249,7 @@ class QuizService:
                                 f"• {len(has_answer)} đáp án từ file"
                             )
                         
-                    base_title = metadata.get("title") or f"Trích xuất từ {filename}"
+                    base_title = f"Trích xuất từ {filename}"
                     
                     # Keep every extracted and de-duplicated question in one
                     # quiz. Subject metadata is retained, while section
@@ -282,9 +257,9 @@ class QuizService:
                     quiz_data_list = [{
                         "title": base_title,
                         "description": " ".join(desc_parts),
-                        "subject": metadata.get("subject"),
-                        "exam_type": metadata.get("exam_type"),
-                        "school": metadata.get("school"),
+                        "subject": subject,
+                        "exam_type": exam_type,
+                        "school": school,
                         "questions": unique_questions,
                     }]
             else:
@@ -385,7 +360,7 @@ class QuizService:
     ) -> list[dict]:
         """
         Gửi các câu hỏi thiếu đáp án lên AI để giải.
-        Xử lý song song các batch (30 câu/batch) với Semaphore để tối ưu tốc độ và tránh timeout.
+        Chỉ dùng AI ở bước trả lời các câu đã được parser code tách ra.
         
         Returns: list of dicts with 'correct_answer' and 'explanation' 
                  IN THE SAME ORDER as input questions.
@@ -394,7 +369,7 @@ class QuizService:
         
         # Returning corrected text and choices has a larger JSON payload than
         # answer-only solving, so use smaller batches to avoid truncation.
-        BATCH_SIZE = 10 if repair_ocr else 30
+        BATCH_SIZE = 60 if not repair_ocr else 10
         # Khởi tạo mảng kết quả với cùng kích thước, mặc định rỗng
         all_solved = [None] * len(questions)
         
@@ -496,8 +471,9 @@ Return ONLY a valid JSON object matching this structure:
             except Exception as e:
                 logger.error(f"Batch {batch_idx + 1} failed: {e}")
 
-        # Giới hạn tối đa 5 requests song song cùng lúc
-        sem = asyncio.Semaphore(5)
+        # One request at a time prevents a large document from consuming an
+        # entire provider rate limit in a few seconds.
+        sem = asyncio.Semaphore(1)
         async def solve_batch_with_sem(batch_idx, batch):
             async with sem:
                 await solve_batch(batch_idx, batch)
