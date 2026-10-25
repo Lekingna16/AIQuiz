@@ -13,6 +13,7 @@ FastAPI APIRouter hoạt động giống "mini FastAPI app":
 - Sau đó include vào main app
 """
 
+import asyncio
 import logging
 
 from bson import ObjectId
@@ -63,6 +64,26 @@ router = APIRouter(
     prefix="/api/documents",
     tags=["Documents"],  # Nhóm trong Swagger UI
 )
+
+# Small Render instances should process one expensive AI request at a time.
+# Rejecting immediately is safer than allowing concurrent generations to
+# exhaust memory/CPU and make every request time out.
+_generation_semaphore = asyncio.Semaphore(1)
+
+
+async def _generate_in_available_slot(quiz_service: QuizService, **kwargs):
+    try:
+        await asyncio.wait_for(_generation_semaphore.acquire(), timeout=0.1)
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="Máy chủ đang xử lý một tài liệu khác. Vui lòng thử lại sau ít phút.",
+        ) from exc
+
+    try:
+        return await quiz_service.upload_and_generate_quiz(**kwargs)
+    finally:
+        _generation_semaphore.release()
 
 
 # ============================================
@@ -283,7 +304,8 @@ async def upload_document(
         ai_service = DeepSeekService(api_key=settings.DEEPSEEK_API_KEY)
         quiz_service = QuizService(db=db, gemini_service=ai_service)
 
-        result = await quiz_service.upload_and_generate_quiz(
+        result = await _generate_in_available_slot(
+            quiz_service,
             file_bytes=file_bytes,
             filename=file.filename,
             file_type=file_ext,
@@ -300,6 +322,9 @@ async def upload_document(
         )
 
         return result
+
+    except HTTPException:
+        raise
 
     except ValueError as e:
         # Text extraction / validation errors

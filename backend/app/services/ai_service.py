@@ -347,9 +347,11 @@ Return ONLY a valid JSON object matching this structure:
                     ],
                     response_format={"type": "json_object"},
                     temperature=0.3,  # Low temp → consistent, factual output
-                    max_tokens=8192,
+                    # 4k output tokens are sufficient for the allowed quiz
+                    # sizes while finishing reliably behind a web proxy.
+                    max_tokens=4096,
                 ),
-                timeout=300,  # Tăng lên 300s cho các file lớn
+                timeout=90,
             )
 
             content = response.choices[0].message.content
@@ -367,7 +369,7 @@ Return ONLY a valid JSON object matching this structure:
 
         except asyncio.TimeoutError:
             raise APIConnectionError(
-                "DeepSeek API timeout after 300 seconds. "
+                "DeepSeek API timeout after 90 seconds. "
                 "The document might be too long or the API is overloaded."
             )
         except Exception as e:

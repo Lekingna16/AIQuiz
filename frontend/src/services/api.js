@@ -130,8 +130,8 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
     formData,
     {
       headers: { "Content-Type": "multipart/form-data" },
-      // Timeout riêng cho upload: 10 phút (AI processing có thể rất lâu)
-      timeout: 600000,
+      // Stop waiting before the hosting proxy drops a stalled AI request.
+      timeout: 120000,
       // Theo dõi tiến trình upload file
       onUploadProgress: onProgress
         ? (progressEvent) => {

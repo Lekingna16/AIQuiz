@@ -28,7 +28,10 @@ import re
 # Gemini 2.0 Flash context window: ~1M tokens
 # Nhưng ta giới hạn input text ở mức an toàn hơn
 # để chừa cho system prompt + response
-MAX_INPUT_CHARS = 120_000  # ~30k tokens (ước lượng 4 chars/token)
+# A synchronous AI generation request must complete within the proxy timeout
+# of small deployments.  Keeping roughly 10k input tokens gives the model
+# enough source context without holding the web worker for several minutes.
+MAX_INPUT_CHARS = 40_000  # ~10k tokens (ước lượng 4 chars/token)
 MIN_INPUT_CHARS = 100       # Tối thiểu để tạo câu hỏi có ý nghĩa
 
 
