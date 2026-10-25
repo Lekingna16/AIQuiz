@@ -79,6 +79,21 @@ class Settings(BaseSettings):
     # Giới hạn kích thước file upload (đơn vị: MB)
     MAX_FILE_SIZE_MB: int = 50
 
+    # --- OCR (ảnh scan trong PDF, ảnh chèn trong Word) ---
+    # OCR cục bộ dùng Tesseract nhúng sẵn trong PyMuPDF, chỉ cần file
+    # *.traineddata (chạy: python scripts/download_tessdata.py).
+    OCR_ENABLED: bool = True
+    # Ngôn ngữ Tesseract, nối bằng "+" (vie = tiếng Việt, eng = tiếng Anh)
+    OCR_LANGUAGES: str = "vie+eng"
+    # Độ phân giải render trang PDF trước khi OCR (250 = cân bằng tốc độ & độ nét)
+    OCR_DPI: int = 250
+    # Số trang PDF tối đa được OCR cục bộ cho 1 file (bảo vệ server nhỏ)
+    OCR_MAX_PAGES: int = 60
+    # Thư mục chứa *.traineddata; để trống → tự tìm (backend/tessdata, env, máy)
+    TESSDATA_PREFIX: str | None = None
+    # Khi không có OCR cục bộ, gửi ảnh cho Gemini Vision đọc (cần AI_PROVIDER=gemini)
+    OCR_GEMINI_FALLBACK: bool = True
+
     # --- Authentication ---
     # Google OAuth2 Client ID
     GOOGLE_CLIENT_ID: str = "YOUR_GOOGLE_CLIENT_ID"

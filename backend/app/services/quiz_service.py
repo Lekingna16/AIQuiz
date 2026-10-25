@@ -34,6 +34,7 @@ Flow chi tiết:
   └── return quiz response
 """
 
+import asyncio
 import logging
 import json
 import re
@@ -42,6 +43,8 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.config import get_settings
+from app.services.ocr_service import LocalOCREngine
 from app.services.text_extractor import TextExtractor
 from app.services.ai_service import (
     DeepSeekService,
@@ -69,7 +72,51 @@ class QuizService:
     def __init__(self, db: AsyncIOMotorDatabase, gemini_service: DeepSeekService):
         self.db = db
         self.gemini = gemini_service
-        self.extractor = TextExtractor()
+        settings = get_settings()
+        self.ocr_gemini_fallback = getattr(settings, "OCR_GEMINI_FALLBACK", True)
+        self.extractor = TextExtractor(
+            ocr=LocalOCREngine.from_settings(settings),
+            ocr_max_pages=getattr(settings, "OCR_MAX_PAGES", None),
+        )
+
+    async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
+        """
+        Trích xuất text (kèm OCR) cho mọi loại file.
+
+        1. Đọc file + OCR cục bộ (chạy trong thread vì OCR tốn CPU, tránh
+           block event loop của FastAPI)
+        2. Ảnh chưa đọc được (server thiếu dữ liệu OCR cục bộ) → Gemini Vision
+        3. Ghép + clean text
+        """
+        result = await asyncio.to_thread(self.extractor.extract_document, file_bytes, file_type)
+
+        pending = result.pending_segments
+        if pending:
+            limit = self.extractor.SCANNED_PDF_MAX_PAGES
+            transcribe = getattr(self.gemini, "transcribe_images", None)
+            if not self.ocr_gemini_fallback or transcribe is None:
+                logger.warning(
+                    "%s: %d image(s) need OCR but no OCR engine is available",
+                    filename, len(pending),
+                )
+            else:
+                if len(pending) > limit:
+                    logger.warning(
+                        "%s: %d images need OCR, only the first %d are sent to Gemini",
+                        filename, len(pending), limit,
+                    )
+                try:
+                    texts = await transcribe([segment.image for segment in pending[:limit]])
+                    result.resolve_pending(texts)
+                except Exception as exc:
+                    logger.warning("%s: Gemini OCR fallback failed: %s", filename, exc)
+
+        if result.used_ocr:
+            logger.info(
+                "%s: OCR used (pages=%s, images=%d)",
+                filename, result.ocr_pages, result.ocr_images,
+            )
+        return self.extractor.finalize_text(result)
 
     async def upload_and_generate_quiz(
         self,
@@ -113,12 +160,13 @@ class QuizService:
             # Step 1: Extract text
             # =====================
             logger.info(f"Extracting text from: {filename} ({file_type})")
-            extracted_text = self.extractor.extract(file_bytes, file_type)
+            extracted_text = await self._extract_text(file_bytes, file_type, filename)
 
-            if not extracted_text.strip() and file_type.lower() == "pdf":
+            if not extracted_text.strip() and file_type.lower() in {"pdf", "docx"}:
                 raise ValueError(
-                    "PDF này là bản scan không có lớp văn bản. "
-                    "Chế độ trích xuất không dùng AI chỉ hỗ trợ PDF có thể bôi đen/copy chữ."
+                    "Không đọc được chữ từ tài liệu (có thể là bản scan/ảnh chụp). "
+                    "Máy chủ chưa có dữ liệu OCR tiếng Việt và Gemini Vision không khả dụng. "
+                    "Vui lòng thử lại sau hoặc tải lên file có thể bôi đen/copy chữ."
                 )
 
             # Validate text content
@@ -191,28 +239,37 @@ class QuizService:
                         f"{len(unsolved_questions)} cần AI giải"
                     )
 
-                    # Chỉ gọi AI cho những câu thực sự thiếu đáp án
-                    questions_to_process = unsolved_questions
+                    # Chỉ gọi AI cho những câu thực sự thiếu đáp án (hoặc cần sửa lỗi OCR nặng)
+                    needs_ocr_repair = self.extractor.has_damaged_ocr_text(extracted_text)
+                    questions_to_process = unique_questions if needs_ocr_repair else unsolved_questions
                     ai_solved = 0
                     if questions_to_process:
                         logger.info(
-                            f"Calling AI answer solver for {len(questions_to_process)} questions..."
+                            f"Calling AI answer solver for {len(questions_to_process)} questions "
+                            f"(repair_ocr={needs_ocr_repair})..."
                         )
                         solved_results = await self._solve_missing_answers_with_ai(
                             questions_to_process,
-                            repair_ocr=False,
+                            repair_ocr=needs_ocr_repair,
                         )
                         
                         # Merge solved answers back bằng INDEX (không dùng text matching)
                         for i, q in enumerate(questions_to_process):
                             solved_q = solved_results[i] if i < len(solved_results) else None
                             if solved_q and solved_q is not None:
-                                answer = solved_q.get("correct_answer", "")
-                                explanation = solved_q.get("explanation", "")
-                                if answer and answer.upper() in {"A", "B", "C", "D"}:
-                                    q["correct_answer"] = answer.upper()
-                                    q["explanation"] = explanation
-                                    ai_solved += 1
+                                if needs_ocr_repair:
+                                    repaired_text = (solved_q.get("question_text") or "").strip()
+                                    repaired_opts = solved_q.get("options")
+                                    if repaired_text and self._has_complete_options(repaired_opts):
+                                        q["question_text"] = repaired_text
+                                        q["options"] = repaired_opts
+                                if not q.get("correct_answer"):
+                                    answer = solved_q.get("correct_answer", "")
+                                    explanation = solved_q.get("explanation", "")
+                                    if answer and answer.upper() in {"A", "B", "C", "D"}:
+                                        q["correct_answer"] = answer.upper()
+                                        q["explanation"] = explanation
+                                        ai_solved += 1
                         
                         logger.info(f"AI solved {ai_solved}/{len(questions_to_process)} questions")
 

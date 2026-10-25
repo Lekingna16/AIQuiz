@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.quiz_service import QuizService
+from app.services.text_extractor import ExtractionResult, TextSegment
 
 
 def _question(number: int) -> dict:
@@ -25,7 +26,9 @@ async def test_extract_keeps_all_questions_in_one_subject_quiz():
     source_text = "Source material " * 20
     questions = [_question(1), _question(2)]
 
-    service.extractor.extract = MagicMock(return_value=source_text)
+    service.extractor.extract_document = MagicMock(
+        return_value=ExtractionResult.from_text(source_text)
+    )
     service.extractor.validate_extracted_text = MagicMock(return_value=(True, ""))
     service._save_document = AsyncMock(return_value="document-id")
     service._save_quiz_and_questions = AsyncMock(
@@ -58,7 +61,9 @@ async def test_upload_metadata_overrides_ai_metadata():
     source_text = "Source material " * 20
     questions = [_question(1)]
 
-    service.extractor.extract = MagicMock(return_value=source_text)
+    service.extractor.extract_document = MagicMock(
+        return_value=ExtractionResult.from_text(source_text)
+    )
     service.extractor.validate_extracted_text = MagicMock(return_value=(True, ""))
     service._save_document = AsyncMock(return_value="document-id")
     service._save_quiz_and_questions = AsyncMock(return_value=("quiz-id", ["question-1"]))
@@ -89,3 +94,26 @@ async def test_upload_metadata_overrides_ai_metadata():
     assert saved_args["subject"] == "Toán học"
     assert saved_args["exam_type"] == "Cuối kỳ"
     assert saved_args["school"] == "Trường ĐH Y Hà Nội"
+
+
+@pytest.mark.asyncio
+async def test_quiz_service_resolves_pending_ocr_segments_with_gemini_fallback():
+    gemini_mock = MagicMock()
+    gemini_mock.transcribe_images = AsyncMock(
+        return_value=["Câu 2: Nội dung đọc từ ảnh scan bằng Gemini Vision?\nA. 1\nB. 2\nC. 3\nD. 4"]
+    )
+    service = QuizService(db=MagicMock(), gemini_service=gemini_mock)
+
+    extraction = ExtractionResult(
+        file_type="pdf",
+        segments=[
+            TextSegment(text="Câu 1: Nội dung chữ gốc trên trang PDF?"),
+            TextSegment(source="pending", image=b"\xff\xd8fake-jpeg", label="page 1 image 1"),
+        ],
+    )
+    service.extractor.extract_document = MagicMock(return_value=extraction)
+
+    final_text = await service._extract_text(b"%PDF-fake", "pdf", "mixed_scan.pdf")
+    gemini_mock.transcribe_images.assert_awaited_once_with([b"\xff\xd8fake-jpeg"])
+    assert "Câu 1: Nội dung chữ gốc" in final_text
+    assert "Câu 2: Nội dung đọc từ ảnh scan bằng Gemini Vision?" in final_text

@@ -370,6 +370,40 @@ Return ONLY a valid JSON object matching this structure:
 
         return "\n\n".join(text for text in page_texts if text.strip()).strip()
 
+    async def transcribe_images(self, images: list[bytes]) -> list[str]:
+        """OCR từng ảnh JPEG bằng Gemini vision, giữ đúng thứ tự/vị trí từng ảnh.
+
+        Dùng làm fallback khi server không có dữ liệu OCR cục bộ. Mỗi ảnh một
+        request để kết quả gắn chính xác vào vị trí ảnh trong tài liệu.
+        """
+        if self.provider_name != "Gemini":
+            raise QuizGenerationError(
+                "Image OCR fallback requires Gemini to be configured as the AI provider."
+            )
+
+        instruction = (
+            "You are an OCR engine for Vietnamese educational material. "
+            "Transcribe every visible word in this image exactly, preserving question "
+            "numbers, answer choices (A. B. C. D.), formulas, and line breaks. "
+            "If an answer choice is visibly circled, highlighted, bolded or ticked, "
+            "wrap that whole choice line in ** like **A. text**. "
+            "Do not summarize, solve, translate, or add commentary. "
+            "If the image contains no text, return an empty response. Return plain text only."
+        )
+        texts = []
+        for image in images:
+            encoded_image = base64.b64encode(image).decode("ascii")
+            content = [
+                {"type": "text", "text": instruction},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}},
+            ]
+            try:
+                texts.append(await self._call_vision_ocr(content))
+            except QuizGenerationError:
+                # Ảnh không có chữ → Gemini trả rỗng; không coi là lỗi cả job
+                texts.append("")
+        return texts
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=15),
@@ -633,4 +667,12 @@ class FailoverAIService:
             # Gemini Vision OCR. Do not pretend a scan was transcribed.
             raise QuizGenerationError(
                 "PDF scan cần Gemini Vision để OCR; Gemini hiện đã hết quota."
+            ) from exc
+
+    async def transcribe_images(self, *args, **kwargs) -> list[str]:
+        try:
+            return await self.primary.transcribe_images(*args, **kwargs)
+        except QuotaExceededError as exc:
+            raise QuizGenerationError(
+                "Ảnh scan cần Gemini Vision để OCR; Gemini hiện đã hết quota."
             ) from exc
