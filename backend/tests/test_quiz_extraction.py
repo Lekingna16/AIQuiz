@@ -8,21 +8,27 @@ from app.utils.text_processing import preprocess_text
 
 
 @pytest.mark.asyncio
-async def test_incomplete_extraction_is_not_solved_or_saved_as_a_quiz():
+async def test_one_incomplete_question_does_not_block_the_complete_questions():
     service = QuizService(db=MagicMock(), gemini_service=MagicMock())
     service._extract_text = AsyncMock(return_value=(
-        "Câu 4: Một câu hỏi có phương án bị che bởi chữ viết tay?\n"
+        "Câu 1: Một câu hỏi đã đọc đủ bốn phương án?\n"
+        "A. Phương án một\nB. Phương án hai\nC. Phương án ba\nD. Phương án bốn\n"
+        "Đáp án: A\n"
+        "Câu 39: Một câu hỏi có phương án bị che bởi chữ viết tay?\n"
         "A. Phương án thứ nhất\nB. Phương án thứ hai\nD. Phương án thứ tư"
     ))
     service._save_document = AsyncMock(return_value="document-id")
     service._update_document_status = AsyncMock()
     service._solve_missing_answers_with_ai = AsyncMock()
-    service._save_quiz_and_questions = AsyncMock()
-    with pytest.raises(ValueError, match="câu 4"):
-        await service.upload_and_generate_quiz(b"pdf", "exam.pdf", "pdf", mode="extract")
-    service._save_quiz_and_questions.assert_not_awaited()
+    service._save_quiz_and_questions = AsyncMock(return_value=("quiz-id", ["question-1"]))
+    service._build_response = AsyncMock(return_value={"quiz": {"id": "quiz-id"}})
+    await service.upload_and_generate_quiz(b"pdf", "exam.pdf", "pdf", mode="extract")
+    saved = service._save_quiz_and_questions.await_args.kwargs["quiz_data"]
+    assert len(saved["questions"]) == 1
+    assert saved["questions"][0]["question_text"].startswith("Một câu hỏi đã đọc đủ")
+    assert "Bỏ qua 1 câu" in saved["description"]
     service._solve_missing_answers_with_ai.assert_not_awaited()
-    service._update_document_status.assert_awaited_once_with("document-id", "failed")
+    service._update_document_status.assert_awaited_once_with("document-id", "completed")
 
 
 def _question(number: int) -> dict:

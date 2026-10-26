@@ -232,14 +232,14 @@ async def test_visual_review_recovers_missing_option_once():
 
 
 @pytest.mark.asyncio
-async def test_unreadable_or_missing_choices_fail_after_one_review():
+async def test_unreadable_choice_is_returned_for_question_level_filtering_after_review():
     calls = []
     def handler(request):
         calls.append(request)
         return reply("Câu 4: Tác nhân nào?\nA. First\nB. Second\nC. [không rõ]\nD. Fourth")
     reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
-    with pytest.raises(PDFReadError, match="câu 4"):
-        await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    result = await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    assert "C. [không rõ]" in result
     assert len(calls) == 2
 
 
@@ -264,6 +264,6 @@ async def test_review_must_not_remove_a_question_entirely():
         calls.append(request)
         return reply(complete_question(1) + ("\nCâu 2: Missing all options?" if len(calls) == 1 else ""))
     reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
-    with pytest.raises(PDFReadError, match="câu 2"):
-        await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    result = await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    assert "Câu 2: Missing all options?" in result
     assert len(calls) == 2

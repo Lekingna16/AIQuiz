@@ -33,13 +33,46 @@ def transcription_issues(text: str) -> list[tuple[int, int, str]]:
     return issues
 
 
-def validate_extracted_questions(questions: list[dict]) -> None:
-    invalid = [str(index) for index, q in enumerate(questions, 1)
-               if not complete_options(q.get("options")) or UNCLEAR.search(q.get("question_text", ""))]
-    if invalid:
-        raise ValueError(
-            "Chưa đọc đủ hoặc chưa rõ các phương án A–D ở câu thứ "
-            + ", ".join(invalid[:12])
-            + ". Chưa tạo quiz để tránh làm mất phương án. Vui lòng dùng ảnh rõ hơn "
-              "hoặc bản đề không bị chữ viết tay che khuất."
-        )
+def partition_complete_questions(questions: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Keep usable questions while isolating ones that still need manual review."""
+    complete = []
+    incomplete = []
+    for question in questions:
+        target = complete if (
+            complete_options(question.get("options"))
+            and not UNCLEAR.search(question.get("question_text", ""))
+        ) else incomplete
+        target.append(question)
+    return complete, incomplete
+
+
+def merge_reviewed_transcription(original: str, reviewed: str) -> str:
+    """Replace only question blocks that became complete on the visual retry.
+
+    The retry occasionally fixes one question while dropping another. Starting
+    from the original text and applying only proven improvements preserves both.
+    """
+    def blocks(text: str):
+        headings = list(HEADINGS.finditer(text))
+        return {
+            heading.group(1): text[heading.start():(
+                headings[index + 1].start() if index + 1 < len(headings) else len(text)
+            )]
+            for index, heading in enumerate(headings)
+        }
+
+    reviewed_blocks = blocks(reviewed)
+    headings = list(HEADINGS.finditer(original))
+    if not headings:
+        return reviewed if not transcription_issues(reviewed) else original
+
+    pieces = [original[:headings[0].start()]]
+    for index, heading in enumerate(headings):
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(original)
+        source_block = original[heading.start():end]
+        candidate = reviewed_blocks.get(heading.group(1), "")
+        if candidate and not transcription_issues(candidate):
+            pieces.append(candidate.rstrip() + "\n\n")
+        else:
+            pieces.append(source_block.rstrip() + "\n\n")
+    return "".join(pieces).strip()

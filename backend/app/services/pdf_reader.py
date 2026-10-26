@@ -11,7 +11,7 @@ import httpx
 
 from app.services.scan_layout import has_hidden_scan_text, photo_regions
 from app.services.exam_reading_rules import LAYOUT_READING_RULES
-from app.utils.extraction_quality import transcription_issues
+from app.utils.extraction_quality import merge_reviewed_transcription, transcription_issues
 
 logger = logging.getLogger(__name__)
 MAX_BATCH_BYTES = 10 * 1024 * 1024
@@ -182,19 +182,13 @@ class ConcurrentPDFReader:
                     index, text = task.result()
                     texts[index] = text
                 reviewed = "\n\n".join(texts)
-                # A retry must not erase entire questions that existed before.
-                from app.utils.extraction_quality import HEADINGS
-                original_numbers = {m.group(1) for m in HEADINGS.finditer(joined)}
-                reviewed_numbers = {m.group(1) for m in HEADINGS.finditer(reviewed)}
-                remaining = transcription_issues(reviewed)
-                bad_numbers = {number for _, _, number in remaining} | (original_numbers - reviewed_numbers)
-                if bad_numbers:
-                    raise PDFReadError(
-                        "Đã đọc lại ảnh nhưng chưa đủ/rõ phương án ở câu "
-                        + ", ".join(sorted(bad_numbers, key=int)[:12])
-                        + ". Chưa tạo quiz. Vui lòng dùng bản đề rõ hơn ở các câu này."
+                joined = merge_reviewed_transcription(joined, reviewed)
+                remaining = transcription_issues(joined)
+                if remaining:
+                    logger.warning(
+                        "Visual review still has incomplete questions; parser will skip them: %s",
+                        ", ".join(number for _, _, number in remaining),
                     )
-                joined = reviewed
         return joined
 
 

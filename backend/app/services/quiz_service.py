@@ -60,7 +60,7 @@ from app.services.pdf_reader import (
 )
 from app.services.ai_service import DeepSeekService
 from app.utils.text_processing import preprocess_text
-from app.utils.extraction_quality import validate_extracted_questions, transcription_issues
+from app.utils.extraction_quality import partition_complete_questions
 
 logger = logging.getLogger(__name__)
 
@@ -325,17 +325,16 @@ class QuizService:
                 )
 
                 logger.info("Using programmatic parser for extraction")
-                issues = transcription_issues(extracted_text)
-                if issues:
-                    raise ValueError(
-                        "Chưa đọc đủ/rõ phương án ở câu "
-                        + ", ".join(number for _, _, number in issues[:12])
-                        + ". Vui lòng kiểm tra bản đề hoặc dùng ảnh rõ hơn."
-                    )
                 raw_questions = parse_questions_from_text(extracted_text)
                 logger.info(f"Parsed {len(raw_questions)} raw questions")
 
                 unique_questions = deduplicate_questions(raw_questions)
+                unique_questions, skipped_questions = partition_complete_questions(unique_questions)
+                if skipped_questions:
+                    logger.warning(
+                        "%s: skipped %d question(s) that still lack a complete A-D set",
+                        filename, len(skipped_questions),
+                    )
                 logger.info(f"After dedup: {len(unique_questions)} unique questions")
 
                 if not unique_questions:
@@ -363,7 +362,6 @@ class QuizService:
                     )
                     quiz_data_list = [quiz_data]
                 else:
-                    validate_extracted_questions(unique_questions)
                     # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
                     has_answer = [q for q in unique_questions if q.get("correct_answer")]
                     unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
@@ -442,6 +440,10 @@ class QuizService:
                             desc_parts.append(
                                 f"• {len(has_answer)} đáp án từ file"
                             )
+                    if skipped_questions:
+                        desc_parts.append(
+                            f"• Bỏ qua {len(skipped_questions)} câu chưa đọc đủ A-D"
+                        )
                         
                     base_title = f"Trích xuất từ {filename}"
                     
@@ -474,7 +476,14 @@ class QuizService:
             saved_quiz_ids = []
             if mode == "extract":
                 for q_data in quiz_data_list:
-                    validate_extracted_questions(q_data["questions"])
+                    complete, incomplete = partition_complete_questions(q_data["questions"])
+                    q_data["questions"] = complete
+                    if incomplete:
+                        logger.warning("Skipping %d incomplete question(s) before save", len(incomplete))
+                    if not complete:
+                        raise ValueError(
+                            "Không có câu nào đọc đủ bốn phương án A–D để tạo quiz."
+                        )
             await self._progress("saving")
             for q_data in quiz_data_list:
                 qid, q_ids = await self._save_quiz_and_questions(
