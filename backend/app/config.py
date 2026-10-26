@@ -95,6 +95,10 @@ class Settings(BaseSettings):
     # Independent from answer generation; never silently call Gemini on quota.
     OCR_PROVIDER: str = "deepseek"
     OCR_AI_VISION: bool = True
+    # Khi parser theo cấu trúc không nhận ra một định dạng đề mới, cho phép AI
+    # trích xuất theo ngữ nghĩa thay vì báo "không tìm thấy câu hỏi". Có thể
+    # tắt trong môi trường cần tuyệt đối không gửi nội dung tài liệu tới AI.
+    EXTRACT_AI_FALLBACK: bool = True
 
     @field_validator("OCR_PROVIDER")
     @classmethod

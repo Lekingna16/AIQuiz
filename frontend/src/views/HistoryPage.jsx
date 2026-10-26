@@ -5,7 +5,7 @@
  * Phase 4: Danh sách quiz với pagination, click vào để làm lại
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Clock, Loader2, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ function HistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const { isAuthenticated } = useAuthStore();
 
-  const fetchHistory = async (pageToFetch) => {
+  const fetchHistory = useCallback(async (pageToFetch) => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
@@ -35,16 +35,16 @@ function HistoryPage() {
       setDocuments(documentData.documents);
       setTotalPages(attemptData.pages);
       setPage(attemptData.page);
-    } catch (error) {
+    } catch {
       toast.error("Không thể tải lịch sử. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchHistory(1);
-  }, []);
+  }, [fetchHistory]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Bạn có chắc muốn xóa file upload này và toàn bộ quiz tạo từ file?")) return;
@@ -53,7 +53,7 @@ function HistoryPage() {
       await deleteDocument(id);
       toast.success("Đã xóa file upload và dữ liệu liên quan.");
       fetchHistory(page);
-    } catch (error) {
+    } catch {
       toast.error("Không thể xóa file upload.");
     }
   };

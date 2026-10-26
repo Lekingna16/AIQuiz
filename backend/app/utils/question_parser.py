@@ -25,7 +25,6 @@ Performance: parse file 0.3MB (~100 câu) < 50ms.
 
 import re
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,11 @@ ANSWER_PATTERNS = [
     ),
 ]
 
-# Pattern: option ở đầu dòng riêng
+# Pattern: option ở đầu dòng riêng. Some OCR / PDF text layers lose the dot
+# between the option key and its text (``A Mycobacterium ...``), so whitespace
+# is accepted as a last-resort separator too.
 SINGLE_OPTION_PATTERN = re.compile(
-    r"^\s*(?:đáp\s*án\s*)?([A-Da-d])\s*[.):\-]\s*(.*)$",
+    r"^\s*(?:đáp\s*án\s*)?([A-Da-d])(?:\s*[.):\-]\s*|\s+)(.*)$",
     re.IGNORECASE,
 )
 
@@ -75,6 +76,13 @@ QUESTION_NUM_PATTERN = re.compile(
 # as a lowercase L. Standalone numbers are considered questions only after
 # the preceding question already has options.
 QUESTION_STANDALONE_NUM_PATTERN = re.compile(r"^\s*(\d{1,4})\s*$")
+
+SHARED_PASSAGE_PATTERN = re.compile(
+    r"^\s*(?:(?:Phần|Dữ\s*kiện|Tình\s*huống)\s+)?"
+    r"(?:câu\s*hỏi|các\s*câu(?:\s*hỏi)?|câu)\s+"
+    r"(\d{1,4})\s*[-–—]\s*(\d{1,4})\s*[:.]\s*(.*)$",
+    re.IGNORECASE,
+)
 
 # Header/footer trang đề thi & trạm thi (kết thúc câu cuối trang, tránh nối nhầm vào đáp án D)
 PAGE_OR_EXAM_HEADER_PATTERN = re.compile(
@@ -447,6 +455,14 @@ def _extract_options_from_line(line: str) -> list[dict]:
         raw_k = m.group(1)
         key = "C" if raw_k == "€" else raw_k.upper()
         if key in {"A", "B", "C", "D"}:
+            # A repeated letter or a sentence-final group name is content,
+            # e.g. 'A. ... liên cầu A.' must retain the final 'A.'.
+            if any(start["key"] == key for start in option_starts):
+                continue
+            if not line[m.end():].strip():
+                continue
+            if re.search(r"(?i)\b(?:vitamin|nhóm|liên cầu|type|typ|típ|loại)\s*$", line[:m.start()]):
+                continue
             option_starts.append({
                 "key": key,
                 "pos": m.end(),
@@ -466,6 +482,60 @@ def _extract_options_from_line(line: str) -> list[dict]:
     return options
 
 
+def _split_compacted_option(
+    key: str,
+    text: str,
+    seen_keys: set[str],
+) -> list[dict]:
+    """Split option labels that OCR merged into the preceding option.
+
+    Examples from scanned medical exams::
+
+        B. Cấy dịch khớp xác định liên cầu C xét nghiệm máu ASLO
+        A Mycobacterium tuberculosis B Corynebacterium diphtheriae
+
+    Only a missing next key (A → B → C → D) is eligible. Call after collecting
+    the entire question so e.g. 'vitamin C' cannot steal a later explicit C.
+    """
+    options: list[dict] = []
+    current_key = key.upper()
+    remaining = text.strip()
+    known_keys = {item.upper() for item in seen_keys}
+
+    while current_key in {"A", "B", "C", "D"}:
+        next_key = chr(ord(current_key) + 1)
+        if next_key > "D" or next_key in known_keys:
+            break
+
+        # The separator after the compressed label may be punctuation or just
+        # one space. Require text after it so a trailing "C" is not split.
+        marker = re.search(
+            rf"\s+{next_key}(?:\s*[.):\-]\s*|\s+)(?=\S)",
+            remaining,
+        )
+        if not marker:
+            break
+
+        before = remaining[:marker.start()].strip()
+        after = remaining[marker.end():].strip()
+        if len(before) < 2 or len(after) < 2:
+            break
+        # These letters are common parts of medical names, not option labels.
+        if re.search(r"(?i)\b(?:vitamin|nhóm|type|typ|típ|loại|hạng|độ)\s*$", before):
+            break
+
+        options.append({"key": current_key, "text": before})
+        known_keys.add(current_key)
+        current_key = next_key
+        remaining = after
+
+    # Keep a label-only option (``A.`` on one line, text on the next): the
+    # line-by-line parser will append the following text to it.
+    if remaining or not options:
+        options.append({"key": current_key, "text": remaining})
+    return options
+
+
 def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     """
     Quét từng dòng để tìm và xây dựng câu hỏi.
@@ -481,10 +551,21 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
     current_answer = ""
     current_option_raw_lines = []
     current_uses_numeric_options = False
+    shared_range = None
+    shared_lines = []
+    collecting_shared = False
 
     def _save_current():
         """Lưu câu hỏi hiện tại nếu hợp lệ."""
         nonlocal current_q_text, current_options, current_answer, current_q_num, current_option_raw_lines, current_uses_numeric_options
+        if current_q_text and current_options:
+            known_keys = {o["key"] for o in current_options}
+            expanded = []
+            for option in current_options:
+                parts = _split_compacted_option(option["key"], option["text"], known_keys)
+                expanded.extend(parts)
+                known_keys.update(p["key"] for p in parts)
+            current_options = expanded
         if current_q_text and len(current_options) >= 2:
             # Nếu câu hỏi xuống dòng ngay trước "B. Đánh giá...:" rồi mới tới A, C, B, D thật
             while (
@@ -541,7 +622,11 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
                         answer = answer_map[current_q_num]
 
                     questions.append({
-                        "question_text": cleaned,
+                        "question_text": (
+                            " ".join(shared_lines) + "\n\n" + cleaned
+                            if shared_range and shared_range[0] <= current_q_num <= shared_range[1]
+                            and shared_lines else cleaned
+                        ),
                         "options": final_opts[:4],
                         "correct_answer": answer,
                         "explanation": "",
@@ -561,6 +646,21 @@ def _parse_line_by_line(text: str, answer_map: dict[int, str]) -> list[dict]:
         stripped = re.sub(r"^_{1,2}|_{1,2}$", "", stripped).strip()
         if not stripped:
             continue
+
+        shared_match = SHARED_PASSAGE_PATTERN.match(stripped)
+        if shared_match and int(shared_match.group(1)) <= int(shared_match.group(2)):
+            _save_current()
+            shared_range = (int(shared_match.group(1)), int(shared_match.group(2)))
+            shared_lines = [shared_match.group(3).strip()] if shared_match.group(3).strip() else []
+            collecting_shared = True
+            continue
+
+        if collecting_shared:
+            if not (QUESTION_PREFIX_PATTERN.match(stripped) or QUESTION_NUM_PATTERN.match(stripped)):
+                if not PAGE_OR_EXAM_HEADER_PATTERN.match(stripped):
+                    shared_lines.append(stripped)
+                continue
+            collecting_shared = False
 
         # A numbered option can look like a question prefix when options use 1-4.
         numeric_option_match = NUMERIC_OPTION_PATTERN.match(stripped)

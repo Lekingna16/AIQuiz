@@ -8,27 +8,26 @@ Endpoints:
 - POST /api/quizzes/{id}/submit → Nộp bài và chấm điểm
 """
 
-from typing import Dict, Any
+import logging
+import math
+from datetime import datetime, timezone
+
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Query, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
-import math
-from datetime import datetime, timezone
 
 from app.database import get_db
 from app.education_catalog import EXAM_TYPES, SUBJECTS
 from app.services.education_catalog_service import get_courses_by_major
 from app.models.quiz import (
-    QuizResponse,
-    QuizSummaryResponse,
     QuizSubmitRequest,
     AnswerCheckRequest,
-    QuizSubmitResponse,
-    QuestionResponse,
     AnswerResult,
 )
 from app.models.user import UserResponse
 from app.dependencies import get_current_user, get_current_user_optional
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -341,7 +340,6 @@ async def get_my_attempts(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    import traceback
     try:
         skip = (page - 1) * limit
         query = {"user_id": str(current_user.id)}
@@ -369,11 +367,9 @@ async def get_my_attempts(
             "page": page,
             "pages": math.ceil(total / limit) if limit else 0,
         }
-    except Exception as e:
-        with open("error_log.txt", "a", encoding="utf-8") as f:
-            f.write("ERROR in get_my_attempts:\\n")
-            f.write(traceback.format_exc() + "\\n")
-        raise e
+    except Exception:
+        logger.exception("Error in get_my_attempts for user_id=%s", current_user.id)
+        raise
 
 @router.get(
     "/attempts/{attempt_id}",

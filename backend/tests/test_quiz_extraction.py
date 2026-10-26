@@ -4,6 +4,25 @@ import pytest
 
 from app.services.quiz_service import QuizService
 from app.services.text_extractor import ExtractionResult, TextSegment
+from app.utils.text_processing import preprocess_text
+
+
+@pytest.mark.asyncio
+async def test_incomplete_extraction_is_not_solved_or_saved_as_a_quiz():
+    service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    service._extract_text = AsyncMock(return_value=(
+        "Câu 4: Một câu hỏi có phương án bị che bởi chữ viết tay?\n"
+        "A. Phương án thứ nhất\nB. Phương án thứ hai\nD. Phương án thứ tư"
+    ))
+    service._save_document = AsyncMock(return_value="document-id")
+    service._update_document_status = AsyncMock()
+    service._solve_missing_answers_with_ai = AsyncMock()
+    service._save_quiz_and_questions = AsyncMock()
+    with pytest.raises(ValueError, match="câu 4"):
+        await service.upload_and_generate_quiz(b"pdf", "exam.pdf", "pdf", mode="extract")
+    service._save_quiz_and_questions.assert_not_awaited()
+    service._solve_missing_answers_with_ai.assert_not_awaited()
+    service._update_document_status.assert_awaited_once_with("document-id", "failed")
 
 
 def _question(number: int) -> dict:
@@ -94,6 +113,47 @@ async def test_upload_metadata_overrides_ai_metadata():
     assert saved_args["subject"] == "Toán học"
     assert saved_args["exam_type"] == "Cuối kỳ"
     assert saved_args["school"] == "Trường ĐH Y Hà Nội"
+
+
+@pytest.mark.asyncio
+async def test_extract_uses_ai_fallback_for_an_unfamiliar_question_layout():
+    """A new layout must not fail solely because the regex parser has no rule for it."""
+    service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    source_text = "Đề có phương án đặt trong bảng và không dùng nhãn A-D. " * 8
+    fallback_quiz = {"title": "Đề form mới", "questions": [_question(1)]}
+
+    service.extractor.extract_document = MagicMock(
+        return_value=ExtractionResult.from_text(source_text)
+    )
+    service.extractor.validate_extracted_text = MagicMock(return_value=(True, ""))
+    service._save_document = AsyncMock(return_value="document-id")
+    service._save_quiz_and_questions = AsyncMock(return_value=("quiz-id", ["question-1"]))
+    service._build_response = AsyncMock(return_value={"quiz": {"id": "quiz-id"}})
+    service._update_document_status = AsyncMock()
+    service.gemini.generate_quiz = AsyncMock(return_value=fallback_quiz)
+
+    with (
+        patch("app.utils.question_parser.parse_questions_from_text", return_value=[]),
+        patch("app.utils.question_parser.deduplicate_questions", return_value=[]),
+    ):
+        await service.upload_and_generate_quiz(
+            file_bytes=b"file",
+            filename="new-layout.pdf",
+            file_type="pdf",
+            mode="extract",
+            num_questions=10,
+            difficulty="mixed",
+            language="vi",
+        )
+
+    service.gemini.generate_quiz.assert_awaited_once_with(
+        text=preprocess_text(source_text),
+        num_questions=10,
+        difficulty="mixed",
+        language="vi",
+        mode="extract",
+    )
+    assert service._save_quiz_and_questions.await_args.kwargs["quiz_data"] == fallback_quiz
 
 
 @pytest.mark.asyncio

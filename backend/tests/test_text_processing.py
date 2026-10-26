@@ -8,8 +8,6 @@ Test strategy:
 - Test edge cases: text rỗng, text quá dài
 """
 
-import pytest
-
 from app.utils.text_processing import (
     preprocess_text,
     smart_truncate,
@@ -19,7 +17,6 @@ from app.utils.text_processing import (
     _remove_repeated_headers,
     _normalize_whitespace,
     MAX_INPUT_CHARS,
-    MIN_INPUT_CHARS,
 )
 
 

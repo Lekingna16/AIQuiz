@@ -21,14 +21,14 @@ function AttemptPage() {
       try {
         const data = await getAttemptDetails(attemptId);
         setAttempt(data);
-      } catch (error) {
+      } catch {
         toast.error("Không thể tải kết quả bài làm.");
       } finally {
         setLoading(false);
       }
     };
     fetchAttempt();
-  }, [attemptId]);
+  }, [attemptId, isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -65,7 +65,6 @@ function AttemptPage() {
         score={attempt.score} 
         total={attempt.total} 
         percentage={attempt.percentage} 
-        quizId={attempt.quiz_id}
         questions={attempt.questions || []}
       />
     </div>

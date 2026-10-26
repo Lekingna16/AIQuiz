@@ -58,13 +58,9 @@ from app.services.text_extractor import (
 from app.services.pdf_reader import (
     GeminiPDFReader, DeepSeekPDFReader, split_pdf_batches, PDFReadError,
 )
-from app.services.ai_service import (
-    DeepSeekService,
-    DeepSeekServiceError,
-    QuizGenerationError,
-    APIConnectionError,
-)
+from app.services.ai_service import DeepSeekService
 from app.utils.text_processing import preprocess_text
+from app.utils.extraction_quality import validate_extracted_questions, transcription_issues
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +191,8 @@ class QuizService:
 
         1. PDF scan hoàn toàn → dịch vụ OCR được cấu hình đọc theo nhóm trang giới hạn.
         2. Lỗi/quota được trả rõ ràng; không chạy lại toàn bộ bằng OCR cục bộ.
-        3. PDF/DOCX có text layer luôn được parser trực tiếp, không gửi AI.
+        3. PDF/DOCX có text layer được parser trực tiếp; OCR cục bộ vẫn là
+           phương án dự phòng cho tài liệu không phải scan toàn trang.
         """
         if (
             self.ai_vision_ocr
@@ -328,6 +325,13 @@ class QuizService:
                 )
 
                 logger.info("Using programmatic parser for extraction")
+                issues = transcription_issues(extracted_text)
+                if issues:
+                    raise ValueError(
+                        "Chưa đọc đủ/rõ phương án ở câu "
+                        + ", ".join(number for _, _, number in issues[:12])
+                        + ". Vui lòng kiểm tra bản đề hoặc dùng ảnh rõ hơn."
+                    )
                 raw_questions = parse_questions_from_text(extracted_text)
                 logger.info(f"Parsed {len(raw_questions)} raw questions")
 
@@ -335,10 +339,31 @@ class QuizService:
                 logger.info(f"After dedup: {len(unique_questions)} unique questions")
 
                 if not unique_questions:
-                    raise ValueError(
-                        "Không tìm thấy câu hỏi trắc nghiệm theo định dạng hỗ trợ trong tài liệu."
+                    # The rule-based parser is deliberately fast and reliable for
+                    # familiar layouts, but it cannot enumerate every layout used
+                    # by schools (tables, no A-D prefix, columns read out of order,
+                    # or lightly damaged OCR).  Do not reject a valid new layout
+                    # merely because it did not match one of those rules.
+                    if not getattr(self.settings, "EXTRACT_AI_FALLBACK", True):
+                        raise ValueError(
+                            "Không tìm thấy câu hỏi trắc nghiệm theo định dạng hỗ trợ trong tài liệu."
+                        )
+
+                    logger.info(
+                        "Rule-based parser found no questions in %s; using semantic AI extraction fallback",
+                        filename,
                     )
+                    await self._progress("extracting_with_ai")
+                    quiz_data = await self.gemini.generate_quiz(
+                        text=processed_text,
+                        num_questions=num_questions,
+                        difficulty=difficulty,
+                        language=language,
+                        mode="extract",
+                    )
+                    quiz_data_list = [quiz_data]
                 else:
+                    validate_extracted_questions(unique_questions)
                     # Thống kê đáp án đã có từ parser (inline + tô sẵn + bảng)
                     has_answer = [q for q in unique_questions if q.get("correct_answer")]
                     unsolved_questions = [q for q in unique_questions if not q.get("correct_answer")]
@@ -447,6 +472,9 @@ class QuizService:
             # Step 5: Save quiz + questions to DB
             # =====================
             saved_quiz_ids = []
+            if mode == "extract":
+                for q_data in quiz_data_list:
+                    validate_extracted_questions(q_data["questions"])
             await self._progress("saving")
             for q_data in quiz_data_list:
                 qid, q_ids = await self._save_quiz_and_questions(

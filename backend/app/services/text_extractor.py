@@ -43,6 +43,8 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from app.services.ocr_service import LocalOCREngine
+from app.services.scan_layout import has_hidden_scan_text
+from app.services.exam_layout import order_exam_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +444,6 @@ class TextExtractor:
 
     # Minimum text length để coi là có nội dung hợp lệ (100 ký tự ≈ 1-2 câu)
     MIN_TEXT_LENGTH = 100
-    SCANNED_PDF_MAX_PAGES = 20
     SCANNED_PDF_DPI_SCALE = 2
 
     # --- Ngưỡng phân loại hình học cho trang PDF ---
@@ -528,6 +529,8 @@ class TextExtractor:
                 if doc.page_count == 0 or (doc.needs_pass and not doc.authenticate("")):
                     return False
                 for page in doc:
+                    if has_hidden_scan_text(page):
+                        continue
                     raw_text = page.get_text("text")
                     meaningful = re.sub(r"[^\wÀ-ỹ]", "", raw_text, flags=re.UNICODE)
                     # Một số file scan có số trang/watermark thành lớp text rất ngắn.
@@ -610,32 +613,6 @@ class TextExtractor:
 
         return True, ""
 
-    @classmethod
-    def render_scanned_pdf_pages(cls, file_bytes: bytes) -> list[bytes]:
-        """Render PDF scan chất lượng cao cho Vision OCR tiếng Việt."""
-        try:
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            try:
-                if doc.page_count > cls.SCANNED_PDF_MAX_PAGES:
-                    raise ValueError(
-                        "Scanned PDFs can contain at most "
-                        f"{cls.SCANNED_PDF_MAX_PAGES} pages."
-                    )
-
-                pages = []
-                for page in doc:
-                    # Vision OCR cần nét hơn local OCR: giữ cạnh dài tối đa 3600px
-                    # để dấu tiếng Việt, chữ cái D và công thức nhỏ không bị mất.
-                    pages.append(_render_rect_jpeg(
-                        page, page.rect, preferred_dpi=300, max_render_side=3600
-                    ))
-                return pages
-            finally:
-                doc.close()
-        except ValueError:
-            raise
-        except Exception as exc:
-            raise ValueError("Unable to prepare the scanned PDF for OCR.") from exc
 
     # ============================================
     # PDF extraction (native + embedded images + scanned pages)
@@ -837,7 +814,7 @@ class TextExtractor:
         """
         total_meaningful = sum(b.meaningful_chars for b in blocks)
 
-        if self.has_damaged_ocr_text(raw_page_text):
+        if has_hidden_scan_text(page) or self.has_damaged_ocr_text(raw_page_text):
             return "scan", clusters
 
         unocrd: list[_PdfImageCluster] = []
@@ -946,6 +923,7 @@ class TextExtractor:
 
         raw_blocks = [b for b in data.get("blocks", []) if b.get("type") == 0]
         raw_blocks.sort(key=lambda b: (round(b["bbox"][1] / 6.0), b["bbox"][0]))
+        raw_blocks = order_exam_blocks(raw_blocks)
 
         blocks: list[_PdfTextBlock] = []
         raw_lines_all: list[str] = []
@@ -953,10 +931,7 @@ class TextExtractor:
         for block in raw_blocks:
             block_styled_lines: list[_StyledLine] = []
             meaningful_chars = 0
-            lines = sorted(
-                block.get("lines", []),
-                key=lambda ln: (round(ln["bbox"][1] / 4.0), ln["bbox"][0]),
-            )
+            lines = block.get("lines", [])
 
             for line in lines:
                 # Bỏ qua các dòng chữ xoay chéo (15°–75°) — 100% là watermark chéo nền trang
@@ -1752,9 +1727,6 @@ def _cached_worker_extractor(
     )
 
 
-def render_scan_worker(file_bytes: bytes) -> list[bytes]:
-    """Render in the OCR process so MuPDF cannot block API polling via the GIL."""
-    return TextExtractor.render_scanned_pdf_pages(file_bytes)
 
 
 def extract_document_worker(

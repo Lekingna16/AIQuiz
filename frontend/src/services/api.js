@@ -47,7 +47,7 @@ api.interceptors.request.use(
         if (state.token) {
           config.headers.Authorization = `Bearer ${state.token}`;
         }
-      } catch (e) {
+      } catch {
         // Parse error, ignore
       }
     }

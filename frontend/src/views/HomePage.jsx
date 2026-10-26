@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Brain, Search, Filter, Play, UploadCloud } from "lucide-react";
 import { getQuizzes, getQuizFilters } from "../services/api";
@@ -23,7 +23,7 @@ function HomePage() {
     }
   };
 
-  const fetchQuizzes = async () => {
+  const fetchQuizzes = useCallback(async () => {
     setLoading(true);
     try {
       const filters = {};
@@ -37,7 +37,7 @@ function HomePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [subject, examType]);
 
   useEffect(() => {
     fetchFilters();
@@ -45,7 +45,7 @@ function HomePage() {
 
   useEffect(() => {
     fetchQuizzes();
-  }, [subject, examType]);
+  }, [fetchQuizzes]);
 
   return (
     <div className="home-page">

@@ -22,7 +22,6 @@ Model choice: deepseek-chat
 """
 
 import asyncio
-import base64
 import json
 import logging
 import re
@@ -242,10 +241,8 @@ class DeepSeekService:
 
         questions = quiz_data.get("questions", [])
         if not questions:
-            # Ghi log text ra file để debug
-            with open("failed_extracted_text.log", "w", encoding="utf-8") as f:
-                f.write(text)
-            raise QuizGenerationError("AI generated 0 questions (Extracted text saved to failed_extracted_text.log)")
+            logger.warning("AI generated 0 questions (extracted text length=%d)", len(text))
+            raise QuizGenerationError("AI generated 0 questions")
 
         if mode == "generate":
             quiz_data["questions"] = await self._complete_requested_question_count(
@@ -334,109 +331,6 @@ Return ONLY a valid JSON object matching this structure:
         except json.JSONDecodeError:
             return {}
 
-    async def transcribe_scanned_pdf(self, page_images: list[bytes]) -> str:
-        """Use Gemini vision to read a scan-only PDF rendered as page images."""
-        if self.provider_name != "Gemini":
-            raise QuizGenerationError(
-                "Scan-only PDFs require Gemini to be configured as the AI provider."
-            )
-        if not page_images:
-            raise QuizGenerationError("The scanned PDF has no pages to read.")
-
-        instruction = (
-            "You are a high-accuracy OCR engine. The image is a Vietnamese medical "
-            "exam page. Copy the visible text verbatim in Unicode Vietnamese. Preserve "
-            "every Vietnamese diacritic, capital letter, punctuation mark, question "
-            "number, formula, and line break. Do not translate, summarize, explain, "
-            "correct wording, or guess missing words. Every answer option must be on "
-            "its own line and start exactly with A., B., C., or D. Never omit an "
-            "option: when a character is genuinely unreadable, write [không rõ] in "
-            "its place rather than deleting the line. Return plain text only."
-        )
-        page_texts = []
-
-        # One image per request prevents columns and option lines from one page
-        # being merged into the next page by a vision model.
-        for offset, image in enumerate(page_images):
-            content = [{
-                "type": "text",
-                "text": f"{instruction}\nThis is page {offset + 1}. Start with === PAGE {offset + 1} ===.",
-            }]
-            encoded_image = base64.b64encode(image).decode("ascii")
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
-            })
-
-            page_texts.append(await self._call_vision_ocr(content))
-
-        return "\n\n".join(text for text in page_texts if text.strip()).strip()
-
-    async def transcribe_images(self, images: list[bytes]) -> list[str]:
-        """OCR từng ảnh JPEG bằng Gemini vision, giữ đúng thứ tự/vị trí từng ảnh.
-
-        Dùng làm fallback khi server không có dữ liệu OCR cục bộ. Mỗi ảnh một
-        request để kết quả gắn chính xác vào vị trí ảnh trong tài liệu.
-        """
-        if self.provider_name != "Gemini":
-            raise QuizGenerationError(
-                "Image OCR fallback requires Gemini to be configured as the AI provider."
-            )
-
-        instruction = (
-            "You are an OCR engine for Vietnamese educational material. "
-            "Transcribe every visible word in this image exactly, preserving question "
-            "numbers, answer choices (A. B. C. D.), formulas, and line breaks. "
-            "If an answer choice is visibly circled, highlighted, bolded or ticked, "
-            "wrap that whole choice line in ** like **A. text**. "
-            "Do not summarize, solve, translate, or add commentary. "
-            "If the image contains no text, return an empty response. Return plain text only."
-        )
-        texts = []
-        for image in images:
-            encoded_image = base64.b64encode(image).decode("ascii")
-            content = [
-                {"type": "text", "text": instruction},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}},
-            ]
-            try:
-                texts.append(await self._call_vision_ocr(content))
-            except QuizGenerationError:
-                # Ảnh không có chữ → Gemini trả rỗng; không coi là lỗi cả job
-                texts.append("")
-        return texts
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=15),
-        retry=retry_if_exception(_should_retry_ai_error),
-        reraise=True,
-    )
-    async def _call_vision_ocr(self, content: list[dict]) -> str:
-        """Call Gemini vision without JSON mode; OCR must remain plain text."""
-        try:
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.with_options(timeout=80, max_retries=0).chat.completions.create,
-                    model=self.model,
-                    messages=[{"role": "user", "content": content}],
-                    temperature=0,
-                    max_tokens=8192,
-                ),
-                timeout=90,
-            )
-            text = response.choices[0].message.content
-            if not text:
-                raise QuizGenerationError("Gemini returned no text for the scanned PDF.")
-            return text
-        except asyncio.TimeoutError as exc:
-            raise APIConnectionError("Gemini OCR timed out after 90 seconds.") from exc
-        except (QuizGenerationError, APIConnectionError):
-            raise
-        except Exception as exc:
-            if _is_quota_error(exc):
-                raise QuotaExceededError(f"Gemini OCR quota exceeded: {str(exc)}") from exc
-            raise APIConnectionError(f"Gemini OCR error: {str(exc)}") from exc
 
     @retry(
         stop=stop_after_attempt(3),
@@ -662,21 +556,3 @@ class FailoverAIService:
     async def _call_api_with_retry(self, *args, **kwargs) -> str:
         """Keep the answer-solver path compatible with the failover service."""
         return await self._invoke("_call_api_with_retry", *args, **kwargs)
-
-    async def transcribe_scanned_pdf(self, *args, **kwargs) -> str:
-        try:
-            return await self.primary.transcribe_scanned_pdf(*args, **kwargs)
-        except QuotaExceededError as exc:
-            # The current DeepSeek text endpoint is not a replacement for
-            # Gemini Vision OCR. Do not pretend a scan was transcribed.
-            raise QuizGenerationError(
-                "PDF scan cần Gemini Vision để OCR; Gemini hiện đã hết quota."
-            ) from exc
-
-    async def transcribe_images(self, *args, **kwargs) -> list[str]:
-        try:
-            return await self.primary.transcribe_images(*args, **kwargs)
-        except QuotaExceededError as exc:
-            raise QuizGenerationError(
-                "Ảnh scan cần Gemini Vision để OCR; Gemini hiện đã hết quota."
-            ) from exc

@@ -6,7 +6,7 @@
  * - Content phải: câu hỏi + navigation
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Check, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ function QuizPage() {
       try {
         const data = await getQuiz(quizId);
         setQuiz(data);
-      } catch (error) {
+      } catch {
         toast.error("Không thể tải bài quiz. Vui lòng thử lại.");
       } finally {
         setLoading(false);
@@ -53,7 +53,7 @@ function QuizPage() {
     try {
       const result = await checkQuizAnswer(quizId, questionId, selectedKey);
       setAnswerResults(prev => ({ ...prev, [questionId]: result }));
-    } catch (error) {
+    } catch {
       setAnswers(prev => {
         const nextAnswers = { ...prev };
         delete nextAnswers[questionId];
@@ -65,22 +65,22 @@ function QuizPage() {
     }
   };
 
-  const goToQuestion = (idx) => {
+  const goToQuestion = useCallback((idx) => {
     setCurrentQuestionIndex(idx);
     questionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  }, []);
 
-  const handleNext = () => {
-    if (currentQuestionIndex < quiz.questions.length - 1) {
+  const handleNext = useCallback(() => {
+    if (currentQuestionIndex < (quiz?.questions.length ?? 0) - 1) {
       goToQuestion(currentQuestionIndex + 1);
     }
-  };
+  }, [currentQuestionIndex, quiz, goToQuestion]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (currentQuestionIndex > 0) {
       goToQuestion(currentQuestionIndex - 1);
     }
-  };
+  }, [currentQuestionIndex, goToQuestion]);
 
   const handleSubmit = async () => {
     if (Object.keys(answers).length < quiz.questions.length) {
@@ -101,7 +101,7 @@ function QuizPage() {
       const res = await submitQuiz(quizId, formattedAnswers);
       setResultsData(res);
       toast.success("Nộp bài thành công!");
-    } catch (error) {
+    } catch {
       toast.error("Không thể nộp bài. Vui lòng thử lại.");
     } finally {
       setIsSubmitting(false);
@@ -122,7 +122,7 @@ function QuizPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [quiz, currentQuestionIndex, resultsData]);
+  }, [quiz, resultsData, handleNext, handlePrev]);
 
   if (loading) {
     return (
@@ -151,7 +151,6 @@ function QuizPage() {
           score={resultsData.score} 
           total={resultsData.total} 
           percentage={resultsData.percentage} 
-          quizId={quizId}
           questions={quiz?.questions || []}
         />
       </div>

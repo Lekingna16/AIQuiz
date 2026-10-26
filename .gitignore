@@ -1,8 +1,23 @@
-# Python runtime and test artefacts
+# Environment & secrets
+.env
+*.local
+
+# Python runtime, virtualenvs, and test artifacts
 __pycache__/
 *.py[cod]
+venv/
+.venv/
 .pytest_cache/
 pytest-cache-files-*/
+.coverage
+htmlcov/
 
-# Local server output
+# Frontend dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local logs and scratch work
 *.log
+.scratch/
+.cache/

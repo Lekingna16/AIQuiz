@@ -9,7 +9,9 @@ import pytest
 
 from app.services.pdf_reader import (
     DeepSeekPDFReader, GeminiPDFReader, PDFReadError, split_pdf_batches, prepare_scan_image,
+    prepare_scan_images,
 )
+from app.services.text_extractor import TextExtractor
 
 
 def make_pdf(pages):
@@ -23,6 +25,10 @@ def reply(text, finish="STOP"):
     return httpx.Response(200, json={"candidates": [{
         "finishReason": finish, "content": {"parts": [{"text": text}]},
     }]})
+
+
+def complete_question(number):
+    return f"Câu {number}: Tràn dịch màng phổi?\nA. Mờ đồng nhất\nB. Lựa chọn hai\nC. Lựa chọn ba\nD. Lựa chọn bốn"
 
 
 def test_batches_preserve_every_page_without_rasterizing(monkeypatch):
@@ -59,7 +65,7 @@ async def test_reader_limits_concurrency_and_preserves_vietnamese_source_order()
         else:
             second_finished.set()
         active -= 1
-        return reply(f"Câu {first}: Tràn dịch màng phổi?\nA. Mờ đồng nhất")
+        return reply(complete_question(first))
 
     progress = AsyncMock()
     reader = GeminiPDFReader("test-key", "test-model", transport=httpx.MockTransport(handler))
@@ -144,12 +150,12 @@ async def test_deepseek_sends_image_to_deepseek_only_and_preserves_unicode():
         assert parts[1]["type"] == "image_url"
         assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
         return httpx.Response(200, json={"choices": [{
-            "finish_reason": "stop", "message": {"content": "Câu 1: Mờ đồng nhất"},
+            "finish_reason": "stop", "message": {"content": complete_question(1)},
         }]})
     reader = DeepSeekPDFReader("test-key", "deepseek-flash", executor=None,
                                transport=httpx.MockTransport(handler))
     result = await reader.read(split_pdf_batches(make_pdf(1), 1), AsyncMock())
-    assert result == "Câu 1: Mờ đồng nhất"
+    assert result == complete_question(1)
     assert seen == ["api.deepseek.com"]
 
 
@@ -175,3 +181,89 @@ async def test_deepseek_rejects_truncated_transcription():
         }]})))
     with pytest.raises(PDFReadError, match="chưa đọc hết"):
         await reader.read(split_pdf_batches(make_pdf(1), 1), AsyncMock())
+
+
+def photo_pdf(hidden=True):
+    with fitz.open() as source:
+        p = source.new_page(width=400, height=500)
+        p.insert_text((20, 40), "Printed exam photograph")
+        photo = p.get_pixmap().tobytes("png")
+    with fitz.open() as doc:
+        p = doc.new_page(width=600, height=850)
+        p.insert_image(fitz.Rect(0, 0, 280, 350), stream=photo)
+        p.insert_image(fitz.Rect(300, 400, 580, 750), stream=photo)
+        p.insert_text((20, 20), "Old inaccurate OCR layer with many words " * 2,
+                      fontsize=5, render_mode=3 if hidden else 0)
+        return doc.tobytes()
+
+
+def test_hidden_ocr_layer_routes_to_vision_and_is_removed_from_both_photos():
+    data = photo_pdf()
+    assert TextExtractor.is_scan_only_pdf(data)
+    batches = split_pdf_batches(data, 1)
+    assert [(a, b) for a, b, _ in batches] == [(1, 1)]
+    with fitz.open(stream=batches[0][2], filetype="pdf") as doc:
+        assert len(doc) == 2
+        assert all(not p.get_text().strip() for p in doc)
+    assert len(prepare_scan_images(batches[0][2])) == 2
+
+
+def test_real_visible_text_is_not_misclassified_as_hidden_ocr():
+    data = photo_pdf(hidden=False)
+    assert not TextExtractor.is_scan_only_pdf(data)
+    with fitz.open(stream=split_pdf_batches(data, 1)[0][2], filetype="pdf") as doc:
+        assert len(doc) == 1
+        assert "Old inaccurate" in doc[0].get_text()
+
+
+@pytest.mark.asyncio
+async def test_visual_review_recovers_missing_option_once():
+    prompts = []
+    def handler(request):
+        prompts.append(json.loads(request.content)["contents"][0]["parts"][1]["text"])
+        if len(prompts) == 1:
+            return reply("Câu 4: Tác nhân nào?\nA. First\nB. Second\nD. Fourth")
+        return reply(complete_question(4))
+    reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
+    result = await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    assert "C. Lựa chọn ba" in result
+    assert len(prompts) == 2 and "visual review" in prompts[1]
+    assert "handwriting" in prompts[0] and "do NOT delete an option" in prompts[0]
+
+
+@pytest.mark.asyncio
+async def test_unreadable_or_missing_choices_fail_after_one_review():
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return reply("Câu 4: Tác nhân nào?\nA. First\nB. Second\nC. [không rõ]\nD. Fourth")
+    reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
+    with pytest.raises(PDFReadError, match="câu 4"):
+        await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_choices_continued_on_next_page_do_not_trigger_review():
+    calls = []
+    def handler(request):
+        payload = json.loads(request.content)["contents"][0]["parts"][0]["inlineData"]["data"]
+        with fitz.open(stream=base64.b64decode(payload), filetype="pdf") as doc:
+            first = "Question 1" in doc[0].get_text()
+        calls.append(request)
+        return reply("Câu 1: Question continued?\nA. First\nB. Second" if first else "C. Third\nD. Fourth")
+    reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
+    result = await reader.read(split_pdf_batches(make_pdf(2), 1), AsyncMock())
+    assert "D. Fourth" in result and len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_review_must_not_remove_a_question_entirely():
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return reply(complete_question(1) + ("\nCâu 2: Missing all options?" if len(calls) == 1 else ""))
+    reader = GeminiPDFReader("test", "test", transport=httpx.MockTransport(handler))
+    with pytest.raises(PDFReadError, match="câu 2"):
+        await reader.read(split_pdf_batches(make_pdf(1)), AsyncMock())
+    assert len(calls) == 2

@@ -31,6 +31,7 @@ from functools import cached_property
 from pathlib import Path
 
 import fitz  # PyMuPDF
+from app.services.exam_layout import order_exam_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +58,12 @@ def extract_text_from_textpage(
     data = page.get_text("rawdict", textpage=textpage)
     blocks = [b for b in data.get("blocks", []) if b.get("type") == 0]
     blocks.sort(key=lambda b: (round(b["bbox"][1] / 6.0), b["bbox"][0]))
+    blocks = order_exam_blocks(blocks)
 
     out_blocks: list[str] = []
     for block in blocks:
         block_lines: list[str] = []
-        lines = sorted(block.get("lines", []), key=lambda ln: (round(ln["bbox"][1] / 4.0), ln["bbox"][0]))
+        lines = block.get("lines", [])
         for line in lines:
             parts: list[str] = []
             prev_x1: float | None = None

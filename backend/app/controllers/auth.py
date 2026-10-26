@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Dict, Any
 
 from app.config import get_settings
 from app.services.auth_service import AuthService

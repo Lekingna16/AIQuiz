@@ -3,11 +3,10 @@ import jwt
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from fastapi import HTTPException
-from bson import ObjectId
 
 from app.config import get_settings
 from app.database import Database
-from app.models.user import UserInDB, UserResponse
+from app.models.user import UserResponse
 
 settings = get_settings()
 

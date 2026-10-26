@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getQuizFilters, uploadDocument, waitForUploadJob } from "../services/api";
 
+const DEFAULT_EXAM_TYPES = ["Ôn tập", "Giữa kỳ", "Cuối kỳ"];
+
 const normalizeForSearch = (value) => value
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -100,11 +102,9 @@ const FileUpload = ({ forcedMode }) => {
   const [difficulty, setDifficulty] = useState("mixed");
   const [language, setLanguage] = useState("vi");
   const [mode, setMode] = useState(forcedMode || "generate");
-  const [isPublic, setIsPublic] = useState(false);
   const [major, setMajor] = useState("");
   const [subject, setSubject] = useState("");
   const [examType, setExamType] = useState("");
-  const DEFAULT_EXAM_TYPES = ["Ôn tập", "Giữa kỳ", "Cuối kỳ"];
   const [metadataOptions, setMetadataOptions] = useState({
     majors: [],
     courses_by_major: {},
@@ -170,6 +170,8 @@ const FileUpload = ({ forcedMode }) => {
     preparing_pdf: 'Đang chuẩn bị các trang PDF…',
     reading_pdf: `Đã đọc ${jobProgress?.completed_pages ?? 0}/${jobProgress?.total_pages ?? '?'} trang`,
     parsing: 'Đang tách và kiểm tra câu hỏi…',
+    extracting_with_ai: 'Đang nhận diện định dạng đề mới…',
+    reviewing_pdf: 'Đang đọc lại các phương án bị mờ hoặc bị ghi chú che khuất…',
     solving: `Đang giải ${jobProgress?.question_count ?? ''} câu thiếu đáp án…`,
     generating: 'Đang tạo câu hỏi…',
     saving: 'Đang lưu bài quiz…',
@@ -194,7 +196,7 @@ const FileUpload = ({ forcedMode }) => {
           difficulty: difficulty,
           language: language,
           mode: mode,
-          is_public: isPublic,
+          is_public: false,
           major: major,
           subject: subject,
           exam_type: examType,

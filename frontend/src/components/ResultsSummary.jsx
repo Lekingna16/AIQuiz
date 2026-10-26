@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle, XCircle, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
-const ResultsSummary = ({ results, score, total, percentage, quizId, questions = [] }) => {
+const ResultsSummary = ({ results, score, total, percentage, questions = [] }) => {
   const [showAll, setShowAll] = useState(false);
   
   // Build question map for showing question text

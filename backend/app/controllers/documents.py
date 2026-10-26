@@ -24,8 +24,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.config import get_settings
 from app.database import get_db
 from app.education_catalog import EXAM_TYPES
-from app.models.document import DocumentResponse
-from app.models.quiz import QuizResponse, Difficulty
+from app.models.quiz import Difficulty
 from app.models.user import UserResponse
 from app.dependencies import get_current_user, get_current_user_optional
 from app.services.ai_service import (
