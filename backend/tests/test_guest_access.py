@@ -1,9 +1,10 @@
 from io import BytesIO
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import BackgroundTasks, UploadFile, HTTPException
+from fastapi import BackgroundTasks, UploadFile, HTTPException, Response
 
 from app.models.quiz import Difficulty
 from app.controllers import documents, quizzes
@@ -25,6 +26,33 @@ async def test_upload_catalog_returns_major_specific_course_suggestions():
     assert "Kiểm thử xâm nhập" in filters["courses_by_major"]["An toàn thông tin"]
     assert "Thiết kế đồ họa" in filters["majors"]
     assert len(filters["majors"]) >= 70
+
+
+@pytest.mark.asyncio
+async def test_home_data_combines_quizzes_and_filters_with_public_cache():
+    db = MagicMock()
+    db.quizzes.distinct = AsyncMock(return_value=["Vi sinh", "Dược lý", None])
+    cursor = db.quizzes.find.return_value.sort.return_value.limit.return_value
+    cursor.to_list = AsyncMock(return_value=[{
+        "_id": documents.ObjectId("64b64b64b64b64b64b64b64b"),
+        "title": "Quiz vi sinh",
+        "description": "Ôn tập",
+        "total_questions": 20,
+        "difficulty": "mixed",
+        "subject": "Vi sinh",
+        "created_at": datetime(2026, 10, 27, tzinfo=timezone.utc),
+    }])
+    response = Response()
+
+    result = await quizzes.get_home_page_data(response=response, limit=20, db=db)
+
+    assert result["quizzes"][0]["title"] == "Quiz vi sinh"
+    assert result["filters"]["subjects"] == ["Dược lý", "Vi sinh"]
+    assert "stale-while-revalidate" in response.headers["cache-control"]
+    db.quizzes.find.assert_called_once_with(
+        {"is_public": True, "is_approved": True},
+        quizzes.QUIZ_SUMMARY_FIELDS,
+    )
 
 
 @pytest.mark.asyncio

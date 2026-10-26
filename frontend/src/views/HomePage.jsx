@@ -1,51 +1,102 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Brain, Search, Filter, Play, UploadCloud } from "lucide-react";
-import { getQuizzes, getQuizFilters } from "../services/api";
+import { Brain, Search, Filter, Play, RefreshCw, UploadCloud } from "lucide-react";
+import { getHomePageData, getQuizzes } from "../services/api";
+
+const HOME_CACHE_KEY = "aiquiz-home-v1";
+const HOME_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_FILTERS = {
+  subjects: [],
+  exam_types: ["Ôn tập", "Giữa kỳ", "Cuối kỳ"],
+};
+
+const readHomeCache = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(HOME_CACHE_KEY));
+    if (!cached?.data || Date.now() - cached.savedAt > HOME_CACHE_MAX_AGE_MS) {
+      return null;
+    }
+    return cached.data;
+  } catch {
+    return null;
+  }
+};
+
+const saveHomeCache = (data) => {
+  try {
+    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data }));
+  } catch {
+    // Storage may be disabled or full; the live API response still works.
+  }
+};
 
 function HomePage() {
-  const [quizzes, setQuizzes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [cachedHome] = useState(readHomeCache);
+  const [quizzes, setQuizzes] = useState(() => cachedHome?.quizzes || []);
+  const [loading, setLoading] = useState(() => !cachedHome);
+  const [loadError, setLoadError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Filters
   const [subject, setSubject] = useState("");
   const [examType, setExamType] = useState("");
-  const [filterOptions, setFilterOptions] = useState({
-    subjects: [],
-  });
-
-  const fetchFilters = async () => {
-    try {
-      const data = await getQuizFilters();
-      setFilterOptions(data);
-    } catch (error) {
-      console.error("Failed to fetch filter options", error);
-    }
-  };
-
-  const fetchQuizzes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const filters = {};
-      if (subject) filters.subject = subject;
-      if (examType) filters.exam_type = examType;
-      
-      const data = await getQuizzes(1, 20, filters);
-      setQuizzes(data.quizzes || []);
-    } catch (error) {
-      console.error("Failed to fetch quizzes", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [subject, examType]);
+  const [filterOptions, setFilterOptions] = useState(
+    () => cachedHome?.filters || DEFAULT_FILTERS,
+  );
 
   useEffect(() => {
-    fetchFilters();
-  }, []);
+    const controller = new AbortController();
+    let active = true;
 
-  useEffect(() => {
-    fetchQuizzes();
-  }, [fetchQuizzes]);
+    const loadHomeData = async () => {
+      const hasFilters = Boolean(subject || examType);
+      if (hasFilters || !cachedHome) {
+        setLoading(true);
+      }
+      setLoadError("");
+
+      try {
+        if (!hasFilters) {
+          const data = await getHomePageData(controller.signal);
+          if (!active) return;
+
+          const homeData = {
+            quizzes: data.quizzes || [],
+            filters: data.filters || DEFAULT_FILTERS,
+          };
+          setQuizzes(homeData.quizzes);
+          setFilterOptions(homeData.filters);
+          saveHomeCache(homeData);
+          return;
+        }
+
+        const filters = {};
+        if (subject) filters.subject = subject;
+        if (examType) filters.exam_type = examType;
+        const data = await getQuizzes(1, 20, filters, controller.signal);
+        if (active) {
+          setQuizzes(data.quizzes || []);
+        }
+      } catch (error) {
+        if (!active || error.code === "ERR_CANCELED") return;
+        console.error("Failed to load home-page quizzes", error);
+        setLoadError(
+          error.friendlyMessage
+            || "Chưa thể tải tài nguyên. Máy chủ có thể đang khởi động, vui lòng thử lại.",
+        );
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadHomeData();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [subject, examType, refreshKey, cachedHome]);
 
   return (
     <div className="home-page">
@@ -96,14 +147,33 @@ function HomePage() {
               style={{ flex: 1, minWidth: "150px" }}
             >
               <option value="">Tất cả kỳ thi</option>
-              <option value="Giữa kì">Giữa kì</option>
-              <option value="Cuối kì">Cuối kì</option>
+              {(filterOptions.exam_types || DEFAULT_FILTERS.exam_types).map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
           </div>
 
+          {loadError && quizzes.length > 0 && (
+            <div className="card" role="alert" style={{ padding: "1rem", marginBottom: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+              <span>{loadError} Đang hiển thị dữ liệu đã lưu gần nhất.</span>
+              <button type="button" className="btn" onClick={() => setRefreshKey(key => key + 1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                <RefreshCw size={16} /> Tải lại
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
-              <p>Đang tải tài nguyên...</p>
+              <p>Đang kết nối và tải tài nguyên...</p>
+            </div>
+          ) : loadError && quizzes.length === 0 ? (
+            <div className="card" role="alert" style={{ textAlign: "center", padding: "3rem 2rem" }}>
+              <RefreshCw size={42} style={{ color: "var(--primary-color)", marginBottom: "1rem" }} />
+              <h3>Chưa tải được tài nguyên</h3>
+              <p style={{ color: "var(--text-secondary)" }}>{loadError}</p>
+              <button type="button" className="btn btn-primary" onClick={() => setRefreshKey(key => key + 1)}>
+                Thử tải lại
+              </button>
             </div>
           ) : quizzes.length > 0 ? (
             <div className="quiz-grid" style={{ display: "grid", gap: "1.5rem", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>

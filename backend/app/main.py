@@ -21,7 +21,8 @@ Sau khi chạy, truy cập:
 - ReDoc: http://localhost:8000/redoc           (read-only)
 """
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -56,8 +57,19 @@ async def lifespan(app: FastAPI):
     print(f"[CONFIG] Debug mode: {settings.DEBUG}")
 
     # Kết nối MongoDB (non-blocking: warn if unavailable)
+    async def ensure_indexes_in_background():
+        try:
+            await Database.ensure_indexes()
+        except Exception as exc:
+            print(f"[WARN] Could not ensure MongoDB indexes: {exc}")
+
+    index_task = None
     try:
         await Database.connect()
+        # Index checks require several MongoDB round trips. They are important
+        # for query speed but should not hold up the first page request after a
+        # Render cold start.
+        index_task = asyncio.create_task(ensure_indexes_in_background())
     except Exception as e:
         print(f"[WARN] MongoDB not available: {e}")
         print("[WARN] Running without database - some features won't work")
@@ -65,6 +77,10 @@ async def lifespan(app: FastAPI):
     yield  # ← App đang chạy ở đây
 
     # --- SHUTDOWN ---
+    if index_task and not index_task.done():
+        index_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await index_task
     await Database.disconnect()
     print("[SHUTDOWN] Application shutdown complete")
 

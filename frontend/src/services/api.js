@@ -19,6 +19,8 @@ import { pollUploadJob } from './uploadPolling';
 // Base URL của backend API
 // Vite dùng import.meta.env thay vì process.env (Create React App)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://aiquiz-hla0.onrender.com";
+const PUBLIC_API_BASE_URL = import.meta.env.VITE_PUBLIC_API_URL
+  || (import.meta.env.PROD ? "/public-api" : `${API_BASE_URL.replace(/\/$/, "")}/api`);
 
 // Tạo axios instance với config chung
 const api = axios.create({
@@ -26,9 +28,15 @@ const api = axios.create({
   // Normal API calls should fail quickly instead of leaving the UI blocked.
   // Uploads return a job id quickly, then the UI polls its status.
   timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+});
+
+// Public GET requests use a same-origin Vercel proxy in production. They do
+// not carry Authorization or Content-Type headers, so the browser can skip the
+// CORS preflight and Vercel can cache the home-page response at the edge.
+const publicApi = axios.create({
+  baseURL: PUBLIC_API_BASE_URL,
+  // A free Render instance can need more than 15 seconds for its first boot.
+  timeout: 65000,
 });
 
 /**
@@ -62,42 +70,45 @@ api.interceptors.request.use(
  * Thay vì try/catch trong mỗi component, interceptor bắt lỗi ở 1 chỗ.
  * Components chỉ cần handle business logic, không lo HTTP errors.
  */
+const handleApiError = (error) => {
+  // Phân loại lỗi để hiển thị message phù hợp
+  if (error.response) {
+    // Nếu lỗi 401 hoặc 403 (Hết hạn token, user bị xóa, hoặc thiếu token), force logout
+    // NHƯNG bỏ qua nếu đang gọi endpoint đăng nhập (auth) — vì 401 ở login là lỗi xác thực, không phải hết hạn token
+    const requestUrl = error.config?.url || '';
+    const isAuthRequest = requestUrl.includes('/api/auth/');
+    if ((error.response.status === 401 || error.response.status === 403) && !isAuthRequest) {
+      localStorage.removeItem('auth-storage');
+      window.location.href = '/';
+    }
+    // Server trả về error (4xx, 5xx)
+    const message = error.response.data?.detail || "Đã có lỗi xảy ra";
+    console.error(`API Error [${error.response.status}]:`, message);
+  } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    // Timeout error
+    console.error("Timeout Error: Request đã hết thời gian chờ");
+    error.friendlyMessage = "Máy chủ mất nhiều thời gian để khởi động. Vui lòng thử lại.";
+  } else if (error.code === 'ERR_CANCELED') {
+    // Request bị hủy (AbortController)
+    error.friendlyMessage = "Yêu cầu đã bị hủy.";
+  } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    // Network error - không thể kết nối tới server
+    console.error("Network Error: Không thể kết nối tới server");
+    error.friendlyMessage = "Không thể kết nối tới server. Vui lòng kiểm tra kết nối mạng và thử lại.";
+  } else if (error.request) {
+    // Request gửi đi nhưng không nhận được response
+    console.error("No Response Error: Server không phản hồi");
+    error.friendlyMessage = "Server không phản hồi. Vui lòng thử lại sau.";
+  }
+  return Promise.reject(error);
+};
+
 api.interceptors.response.use(
   (response) => response, // Request thành công → trả nguyên
-  (error) => {
-    // Phân loại lỗi để hiển thị message phù hợp
-    if (error.response) {
-      // Nếu lỗi 401 hoặc 403 (Hết hạn token, user bị xóa, hoặc thiếu token), force logout
-      // NHƯNG bỏ qua nếu đang gọi endpoint đăng nhập (auth) — vì 401 ở login là lỗi xác thực, không phải hết hạn token
-      const requestUrl = error.config?.url || '';
-      const isAuthRequest = requestUrl.includes('/api/auth/');
-      if ((error.response.status === 401 || error.response.status === 403) && !isAuthRequest) {
-        localStorage.removeItem('auth-storage');
-        window.location.href = '/';
-      }
-      // Server trả về error (4xx, 5xx)
-      const message = error.response.data?.detail || "Đã có lỗi xảy ra";
-      console.error(`API Error [${error.response.status}]:`, message);
-    } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      // Timeout error
-      console.error("Timeout Error: Request đã hết thời gian chờ");
-      error.friendlyMessage = "Yêu cầu đã hết thời gian chờ. Tài liệu có thể quá lớn hoặc server đang quá tải. Vui lòng thử lại.";
-    } else if (error.code === 'ERR_CANCELED') {
-      // Request bị hủy (AbortController)
-      console.error("Request cancelled");
-      error.friendlyMessage = "Yêu cầu đã bị hủy.";
-    } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      // Network error - không thể kết nối tới server
-      console.error("Network Error: Không thể kết nối tới server");
-      error.friendlyMessage = "Không thể kết nối tới server. Vui lòng kiểm tra kết nối mạng và thử lại.";
-    } else if (error.request) {
-      // Request gửi đi nhưng không nhận được response
-      console.error("No Response Error: Server không phản hồi");
-      error.friendlyMessage = "Server không phản hồi. Vui lòng thử lại sau.";
-    }
-    return Promise.reject(error);
-  }
+  handleApiError,
 );
+
+publicApi.interceptors.response.use((response) => response, handleApiError);
 
 // ============================================
 // API Functions - Mỗi function tương ứng 1 endpoint
@@ -163,19 +174,27 @@ export const waitForUploadJob = (jobId, onStatus, signal) =>
 /**
  * Lấy các tuỳ chọn bộ lọc (dropdown)
  */
-export const getQuizFilters = async ({ includeCatalog = false } = {}) => {
-  const response = await api.get("/api/quizzes/filters", {
+export const getQuizFilters = async ({ includeCatalog = false, signal } = {}) => {
+  const response = await publicApi.get("/quizzes/filters", {
     params: includeCatalog ? { include_catalog: true } : undefined,
+    signal,
   });
+  return response.data;
+};
+
+/** Load quiz cards and their filters together for the first home render. */
+export const getHomePageData = async (signal) => {
+  const response = await publicApi.get("/quizzes/home", { signal });
   return response.data;
 };
 
 /**
  * Lấy danh sách quiz
  */
-export const getQuizzes = async (page = 1, limit = 10, filters = {}) => {
-  const response = await api.get("/api/quizzes", {
+export const getQuizzes = async (page = 1, limit = 10, filters = {}, signal) => {
+  const response = await publicApi.get("/quizzes", {
     params: { page, limit, ...filters },
+    signal,
   });
   return response.data;
 };

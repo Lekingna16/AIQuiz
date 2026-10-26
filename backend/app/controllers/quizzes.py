@@ -8,12 +8,13 @@ Endpoints:
 - POST /api/quizzes/{id}/submit → Nộp bài và chấm điểm
 """
 
+import asyncio
 import logging
 import math
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Response
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.database import get_db
@@ -34,6 +35,35 @@ router = APIRouter(
     prefix="/api/quizzes",
     tags=["Quizzes"],
 )
+
+
+QUIZ_SUMMARY_FIELDS = {
+    "title": 1,
+    "description": 1,
+    "total_questions": 1,
+    "difficulty": 1,
+    "subject": 1,
+    "major": 1,
+    "exam_type": 1,
+    "school": 1,
+    "created_at": 1,
+}
+
+
+def _serialize_quiz_summary(quiz: dict) -> dict:
+    """Return only the small payload needed by quiz listing cards."""
+    return {
+        "id": str(quiz["_id"]),
+        "title": quiz["title"],
+        "description": quiz.get("description", ""),
+        "total_questions": quiz["total_questions"],
+        "difficulty": quiz["difficulty"],
+        "subject": quiz.get("subject"),
+        "major": quiz.get("major"),
+        "exam_type": quiz.get("exam_type"),
+        "school": quiz.get("school"),
+        "created_at": quiz["created_at"].isoformat(),
+    }
 
 
 @router.get(
@@ -69,6 +99,47 @@ async def get_quiz_filters(
         "exam_types": EXAM_TYPES,
     }
 
+
+@router.get(
+    "/home",
+    response_model=dict,
+    summary="Get initial home-page data",
+    description="Trả danh sách quiz và bộ lọc trong một request nhẹ, có thể cache công khai.",
+)
+async def get_home_page_data(
+    response: Response,
+    limit: int = Query(default=20, ge=1, le=50),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Load all data needed for the first home render with one round trip."""
+    query = {"is_public": True, "is_approved": True}
+    cursor = (
+        db.quizzes.find(query, QUIZ_SUMMARY_FIELDS)
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+
+    subjects, quizzes_db = await asyncio.gather(
+        db.quizzes.distinct("subject", query),
+        cursor.to_list(length=limit),
+    )
+
+    # Vercel's public API proxy can serve this snapshot immediately while a
+    # sleeping Render instance wakes and refreshes it in the background.
+    response.headers["Cache-Control"] = (
+        "public, max-age=60, s-maxage=300, stale-while-revalidate=86400"
+    )
+    return {
+        "quizzes": [_serialize_quiz_summary(quiz) for quiz in quizzes_db],
+        "filters": {
+            "subjects": sorted(
+                (subject for subject in subjects if subject),
+                key=str.casefold,
+            ),
+            "exam_types": EXAM_TYPES,
+        },
+    }
+
 @router.get(
     "",
     response_model=dict,
@@ -100,23 +171,14 @@ async def list_quizzes(
 
     total = await db.quizzes.count_documents(query)
     
-    cursor = db.quizzes.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    cursor = (
+        db.quizzes.find(query, QUIZ_SUMMARY_FIELDS)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
     quizzes_db = await cursor.to_list(length=limit)
-    
-    quizzes = []
-    for q in quizzes_db:
-        quizzes.append({
-            "id": str(q["_id"]),
-            "title": q["title"],
-            "description": q.get("description", ""),
-            "total_questions": q["total_questions"],
-            "difficulty": q["difficulty"],
-            "subject": q.get("subject"),
-            "major": q.get("major"),
-            "exam_type": q.get("exam_type"),
-            "school": q.get("school"),
-            "created_at": q["created_at"].isoformat(),
-        })
+    quizzes = [_serialize_quiz_summary(quiz) for quiz in quizzes_db]
         
     return {
         "quizzes": quizzes,

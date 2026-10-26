@@ -14,6 +14,8 @@ Pattern sử dụng: Singleton Connection
 - Tất cả requests dùng chung connection pool
 """
 
+import asyncio
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import get_settings
@@ -65,23 +67,29 @@ class Database:
         # Nếu MongoDB không chạy → raise exception → app không start
         try:
             await cls.client.admin.command("ping")
-            # Public quiz listing and its filters are the most frequently loaded
-            # views.  These indexes keep the home page queries selective as the
-            # collection grows.
-            await cls.db.quizzes.create_index([
-                ("is_public", 1), ("is_approved", 1), ("created_at", -1),
-            ])
-            await cls.db.quizzes.create_index([
-                ("is_public", 1), ("is_approved", 1), ("subject", 1), ("created_at", -1),
-            ])
-            await cls.db.quizzes.create_index([
-                ("is_public", 1), ("is_approved", 1), ("exam_type", 1), ("created_at", -1),
-            ])
-            await cls.db.upload_jobs.create_index([("created_at", -1)])
             print(f"[OK] Connected to MongoDB: {settings.MONGODB_DB_NAME}")
         except Exception as e:
             print(f"[ERROR] MongoDB connection failed: {e}")
             raise
+
+    @classmethod
+    async def ensure_indexes(cls) -> None:
+        """Ensure indexes without delaying the server's first HTTP response."""
+        if cls.db is None:
+            return
+
+        await asyncio.gather(
+            cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("created_at", -1),
+            ]),
+            cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("subject", 1), ("created_at", -1),
+            ]),
+            cls.db.quizzes.create_index([
+                ("is_public", 1), ("is_approved", 1), ("exam_type", 1), ("created_at", -1),
+            ]),
+            cls.db.upload_jobs.create_index([("created_at", -1)]),
+        )
 
     @classmethod
     async def disconnect(cls) -> None:

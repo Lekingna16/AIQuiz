@@ -16,6 +16,7 @@ FastAPI APIRouter hoạt động giống "mini FastAPI app":
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Query, Depends
@@ -27,16 +28,13 @@ from app.education_catalog import EXAM_TYPES
 from app.models.quiz import Difficulty
 from app.models.user import UserResponse
 from app.dependencies import get_current_user, get_current_user_optional
-from app.services.ai_service import (
-    DeepSeekService,
-    FailoverAIService,
-    DeepSeekServiceError,
-    QuizGenerationError,
-    APIConnectionError,
-)
-from app.services.quiz_service import QuizService
-
 logger = logging.getLogger(__name__)
+
+# Loading the AI SDK and document/OCR pipeline adds noticeable cold-start
+# time. Keep the upload service lazy so public home requests can be served
+# before those modules are needed. The module attribute remains injectable in
+# tests.
+QuizService = None
 
 
 # ============================================
@@ -72,7 +70,7 @@ _generation_semaphore = asyncio.Semaphore(1)
 _upload_reservations: set[ObjectId] = set()
 
 
-async def _generate_in_available_slot(quiz_service: QuizService, **kwargs):
+async def _generate_in_available_slot(quiz_service: Any, **kwargs):
     # Jobs wait in memory instead of making the browser retry while a single
     # small instance is already generating another quiz.
     async with _generation_semaphore:
@@ -90,8 +88,10 @@ def _get_file_extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower()
 
 
-def _create_ai_service(settings) -> DeepSeekService | FailoverAIService:
+def _create_ai_service(settings):
     """Build the configured OpenAI-compatible generation client."""
+    from app.services.ai_service import DeepSeekService, FailoverAIService
+
     provider = getattr(settings, "AI_PROVIDER", "deepseek").strip().lower()
     if provider == "gemini":
         primary = DeepSeekService(
@@ -164,6 +164,16 @@ async def _run_upload_job(
     options: dict,
 ) -> None:
     """Run the expensive extraction and AI generation after the upload responds."""
+    from app.services.ai_service import (
+        APIConnectionError,
+        DeepSeekServiceError,
+        QuizGenerationError,
+    )
+
+    quiz_service_factory = QuizService
+    if quiz_service_factory is None:
+        from app.services.quiz_service import QuizService as quiz_service_factory
+
     async def progress(stage, **details):
         # Progress reporting must not cause a successful AI read to be repeated.
         try:
@@ -178,7 +188,7 @@ async def _run_upload_job(
 
     try:
         settings = get_settings()
-        quiz_service = QuizService(db=db, gemini_service=_create_ai_service(settings))
+        quiz_service = quiz_service_factory(db=db, gemini_service=_create_ai_service(settings))
         quiz_service.progress_callback = progress
         # Includes queue wait, reading and answer solving. Never leave a live
         # process polling indefinitely after provider retries.
