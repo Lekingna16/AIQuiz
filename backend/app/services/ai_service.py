@@ -417,7 +417,7 @@ Return ONLY a valid JSON object matching this structure:
         try:
             response = await asyncio.wait_for(
                 asyncio.to_thread(
-                    self.client.chat.completions.create,
+                    self.client.with_options(timeout=80, max_retries=0).chat.completions.create,
                     model=self.model,
                     messages=[{"role": "user", "content": content}],
                     temperature=0,

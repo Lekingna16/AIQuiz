@@ -148,12 +148,24 @@ app.include_router(auth.router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
-    with open("global_error.txt", "a", encoding="utf-8") as f:
-        f.write(f"Global Error on {request.url}:\\n")
-        f.write(traceback.format_exc() + "\\n")
+    import logging
+    logging.getLogger(__name__).error(
+        "Unhandled error on %s", request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    # ServerErrorMiddleware runs outside CORSMiddleware: its 500 response
+    # needs explicit allowlisted CORS headers or the browser hides the error.
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin in allowed_origins:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
     return JSONResponse(
         status_code=500,
+        headers=headers,
         content={"detail": "An unexpected server error occurred. Please try again later."},
     )
 

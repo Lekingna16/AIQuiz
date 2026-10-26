@@ -125,7 +125,7 @@ async def test_quiz_service_uses_gemini_vision_for_scan_only_pdf():
     )
     service = QuizService(db=MagicMock(), gemini_service=gemini_mock)
     service.extractor.is_scan_only_pdf = MagicMock(return_value=True)
-    service.extractor.render_scanned_pdf_pages = MagicMock(return_value=[b"jpeg-page"])
+    service._render_scan_images = AsyncMock(return_value=[b"jpeg-page"])
     service._run_extractor_isolated = AsyncMock()
 
     final_text = await service._extract_text(b"%PDF-fake", "pdf", "scan.pdf")

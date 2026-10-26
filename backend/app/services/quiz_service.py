@@ -50,8 +50,10 @@ from app.config import get_settings
 from app.services.ocr_service import LocalOCREngine
 from app.services.text_extractor import (
     ExtractionResult,
+    TextSegment,
     TextExtractor,
     extract_document_worker,
+    render_scan_worker,
 )
 from app.services.ai_service import (
     DeepSeekService,
@@ -156,6 +158,11 @@ class QuizService:
 
         return await asyncio.to_thread(self.extractor.extract_document, file_bytes, file_type)
 
+    async def _render_scan_images(self, file_bytes: bytes) -> list[bytes]:
+        return await asyncio.get_running_loop().run_in_executor(
+            _get_ocr_process_pool(), render_scan_worker, file_bytes
+        )
+
     async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
         """
         Trích xuất text cho mọi loại file.
@@ -170,9 +177,7 @@ class QuizService:
             and await asyncio.to_thread(self.extractor.is_scan_only_pdf, file_bytes)
         ):
             try:
-                page_images = await asyncio.to_thread(
-                    self.extractor.render_scanned_pdf_pages, file_bytes
-                )
+                page_images = await self._render_scan_images(file_bytes)
                 vision_text = await self.gemini.transcribe_scanned_pdf(page_images)
                 if vision_text and vision_text.strip():
                     logger.info(
@@ -180,7 +185,9 @@ class QuizService:
                         filename, len(page_images),
                     )
                     return self.extractor.finalize_text(
-                        ExtractionResult.from_text(vision_text, file_type="pdf")
+                        ExtractionResult(file_type="pdf", segments=[
+                            TextSegment(text=vision_text, source="ocr")
+                        ])
                     )
             except Exception as exc:
                 # Không làm hỏng upload khi Vision tạm lỗi/quota; local OCR vẫn

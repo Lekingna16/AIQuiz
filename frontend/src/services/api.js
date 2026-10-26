@@ -178,7 +178,7 @@ export const waitForUploadJob = async (jobId, onStatus) => {
       if (status === 404) {
         const jobMissingError = new Error("Upload job not found");
         jobMissingError.friendlyMessage =
-          "Phiên xử lý tài liệu không còn tồn tại (server vừa khởi động lại hoặc phiên đăng nhập đã thay đổi). Vui lòng tải lại trang và upload lại file.";
+          "Không tìm thấy tác vụ hoặc tài khoản hiện tại không có quyền xem. Hãy kiểm tra đăng nhập và Lịch sử trước khi tải lại file.";
         throw jobMissingError;
       }
       if (status === 401 || status === 403) {

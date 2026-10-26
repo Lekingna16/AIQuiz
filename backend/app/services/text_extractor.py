@@ -1752,6 +1752,11 @@ def _cached_worker_extractor(
     )
 
 
+def render_scan_worker(file_bytes: bytes) -> list[bytes]:
+    """Render in the OCR process so MuPDF cannot block API polling via the GIL."""
+    return TextExtractor.render_scanned_pdf_pages(file_bytes)
+
+
 def extract_document_worker(
     file_bytes: bytes,
     file_type: str,

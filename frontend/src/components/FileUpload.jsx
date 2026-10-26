@@ -185,19 +185,11 @@ const FileUpload = ({ forcedMode }) => {
         // Upload progress callback
         (percent) => {
           setUploadProgress(percent);
-          if (percent >= 100) {
-            setUploadPhase("processing");
-            toast.info(
-              mode === "extract" 
-                ? "Đã tải file lên. Đang trích xuất và lọc câu hỏi trùng..." 
-                : "Đã tải file lên. Đang chuẩn bị bài quiz, quá trình này có thể mất vài phút.",
-              { duration: 10000 }
-            );
-          }
         }
       );
       
       setUploadPhase("processing");
+      toast.info("Máy chủ đã nhận file. Đang đọc tài liệu và tạo câu hỏi…", { duration: 8000 });
       const result = await waitForUploadJob(job.job_id, (status) => {
         if (status === "queued") setUploadPhase("processing");
       });
