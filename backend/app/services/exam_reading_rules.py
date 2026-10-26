@@ -21,6 +21,8 @@ READING PROCEDURE
    BEFORE question 7, never inside option C or D of question 6.
 5. Typography and location determine boundaries. Medical knowledge must not
    replace unreadable source text or move a plausible answer to another question.
+6. Repeated bottom-of-page metadata such as 'M8, Đề A, NH 24-25, YLT23,
+   trang 2' is a FOOTER. Omit it. Never append it to option D or to a question.
 
 EXAMPLES (layout demonstrations only; never copy them into the source output)
 Printed single column:

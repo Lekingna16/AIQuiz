@@ -96,7 +96,19 @@ PAGE_OR_EXAM_HEADER_PATTERN = re.compile(
     r"|ĐỐI\s*TƯỢNG|ĐÓI\s*TƯỢNG|ĐÔI\s*TƯỢNG|DOI\s*TƯỢNG|DÓI\s*TƯỢNG"
     r"|Mã\s*đề\s*thi|Ma\s*đề\s*thi|Ma\s*de\s*thi|Mi\s*dé\s*thi"
     r"|Thời\s*gian\s*làm|Thờigian\s*làm|Thai\s*gian\s*làm)\b.*$"
+    r"|\s*M(?:ODULE)?\s*\d+\s*,?\s*(?:Đề|De)\s*[A-Z0-9]+\s*,?\s*"
+    r"(?:NH|Năm\s*học)\s*\d{2,4}\s*[-/]\s*\d{2,4}\s*,?\s*"
+    r"[A-ZĐ]{1,8}\d{1,4}\s*,?\s*(?:trang|page)\s*\d+(?:\s*/\s*\d+)?\s*$"
     r")",
+    re.IGNORECASE,
+)
+
+# Footer printed at the bottom of photographed exam sheets. OCR frequently
+# appends it to option D because both occupy the last visible line.
+EXAM_FOOTER_SUFFIX_PATTERN = re.compile(
+    r"\s+M(?:ODULE)?\s*\d+\s*,?\s*(?:Đề|De)\s*[A-Z0-9]+\s*,?\s*"
+    r"(?:NH|Năm\s*học)\s*\d{2,4}\s*[-/]\s*\d{2,4}\s*,?\s*"
+    r"[A-ZĐ]{1,8}\d{1,4}\s*,?\s*(?:trang|page)\s*\d+(?:\s*/\s*\d+)?\s*$",
     re.IGNORECASE,
 )
 
@@ -919,6 +931,7 @@ def _strip_trailing_ocr_crumbs(text: str) -> str:
     """Loại bỏ mảnh rác watermark ngắn bám ở cuối câu hỏi hoặc cuối phương án."""
     if not text:
         return ""
+    text = EXAM_FOOTER_SUFFIX_PATTERN.sub("", text)
     text = re.sub(r"\s+\d*th\s*ĐỀ\s*:\s*\d+(?:\s+\d+)?\s*$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s*(?:—|–|-)\s*(?:OS|vÒ`|[<>¿©®°`\"'~]{1,4})\s*$", "", text)
     text = re.sub(r"\s*[©®°„”`~<>]{2,}\s*$", "", text)

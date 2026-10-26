@@ -35,6 +35,34 @@ D. Phương án D
     assert qs[0]["options"][0]["text"] == "Phương án A dài tiếp tục trên dòng mới"
 
 
+def test_removes_exam_footer_appended_to_last_option():
+    q = parse_questions_from_text("""Câu 17: Amphotericine B dùng cùng thuốc nào?
+A. Rifampicin
+B. Tetracyclin
+C. Aminoglycosid
+D. Erythromycin M8, Đề A, NH 24-25, YLT23, trang 2
+""")[0]
+    assert q["options"][3] == {"key": "D", "text": "Erythromycin"}
+
+
+def test_standalone_exam_footer_ends_question_without_becoming_option_text():
+    questions = parse_questions_from_text("""Câu 17: Câu cuối trang?
+A. Một
+B. Hai
+C. Ba
+D. Bốn
+M8, Đề A, NH 24-25, YLT23, trang 2
+Câu 18: Câu đầu trang sau?
+A. Một
+B. Hai
+C. Ba
+D. Bốn
+""")
+    assert len(questions) == 2
+    assert questions[0]["options"][3]["text"] == "Bốn"
+    assert questions[1]["question_text"] == "Câu đầu trang sau?"
+
+
 def test_missing_label_repair_does_not_steal_a_later_explicit_option():
     text = """Câu 1: Chọn nội dung?
 A. Nội dung một
