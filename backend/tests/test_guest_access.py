@@ -3,10 +3,15 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import BackgroundTasks, UploadFile
+from fastapi import BackgroundTasks, UploadFile, HTTPException
 
 from app.models.quiz import Difficulty
 from app.controllers import documents, quizzes
+
+
+@pytest.fixture(autouse=True)
+def isolated_upload_capacity(monkeypatch):
+    monkeypatch.setattr(documents, "_upload_reservations", set())
 
 
 @pytest.mark.asyncio
@@ -80,6 +85,44 @@ async def test_background_upload_job_marks_quiz_as_completed(monkeypatch):
     )
 
     updates = [call.args[1]["$set"] for call in db.upload_jobs.update_one.await_args_list]
-    assert updates[0]["status"] == "processing"
     assert updates[-1]["status"] == "completed"
     assert updates[-1]["quiz_id"] == "quiz-id"
+
+
+async def submit_upload(file, db):
+    return await documents.upload_document(
+        background_tasks=BackgroundTasks(), file=file, num_questions=5,
+        difficulty=Difficulty.MIXED, language="vi", mode="extract", is_public=True,
+        subject="Y khoa", major="Y khoa", exam_type="Cuối kỳ", current_user=None, db=db,
+    )
+
+
+@pytest.mark.asyncio
+async def test_busy_upload_is_rejected_before_reading_into_memory(monkeypatch):
+    monkeypatch.setattr(documents, "get_settings", lambda: SimpleNamespace(MAX_FILE_SIZE_BYTES=1024))
+    documents._upload_reservations.update([documents.ObjectId(), documents.ObjectId()])
+    file = UploadFile(filename="test.txt", file=BytesIO(b"text"))
+    file.read = AsyncMock()
+    with pytest.raises(HTTPException) as error:
+        await submit_upload(file, MagicMock())
+    assert error.value.status_code == 429
+    assert error.value.headers["Retry-After"] == "60"
+    file.read.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_invalid_upload_releases_capacity(monkeypatch):
+    monkeypatch.setattr(documents, "get_settings", lambda: SimpleNamespace(MAX_FILE_SIZE_BYTES=1024))
+    with pytest.raises(HTTPException):
+        await submit_upload(UploadFile(filename="empty.txt", file=BytesIO(b"")), MagicMock())
+    assert not documents._upload_reservations
+
+
+@pytest.mark.asyncio
+async def test_background_failure_releases_capacity(monkeypatch):
+    token = documents.ObjectId()
+    documents._upload_reservations.add(token)
+    monkeypatch.setattr(documents, "_run_upload_job", AsyncMock(side_effect=RuntimeError("DB unavailable")))
+    with pytest.raises(RuntimeError):
+        await documents._process_upload_job(reservation=token)
+    assert not documents._upload_reservations

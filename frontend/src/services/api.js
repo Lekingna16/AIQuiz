@@ -14,6 +14,7 @@
  */
 
 import axios from "axios";
+import { pollUploadJob } from './uploadPolling';
 
 // Base URL của backend API
 // Vite dùng import.meta.env thay vì process.env (Create React App)
@@ -108,7 +109,7 @@ api.interceptors.response.use(
  * @param {Object} options - { num_questions, difficulty, language, major, subject, exam_type, school }
  * @returns {Promise<{job_id: string, status: string}>} queued upload job
  */
-export const uploadDocument = async (file, options = {}, onProgress = null) => {
+export const uploadDocument = async (file, options = {}, onProgress = null, signal) => {
   // Dùng FormData vì gửi file (multipart/form-data)
   const formData = new FormData();
   formData.append("file", file);
@@ -133,6 +134,7 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
       // This request only transfers the file and queues work; allow up to 2m
       // for large PDFs (up to 50MB) on slower connections.
       timeout: 120000,
+      signal,
       // Theo dõi tiến trình upload file
       onUploadProgress: onProgress
         ? (progressEvent) => {
@@ -147,75 +149,16 @@ export const uploadDocument = async (file, options = {}, onProgress = null) => {
   return response.data;
 };
 
-export const getUploadJob = async (jobId) => {
+export const getUploadJob = async (jobId, signal) => {
   const response = await api.get(`/api/documents/jobs/${jobId}`, {
-    timeout: 30000,
+    timeout: 12000,
+    signal,
   });
   return response.data;
 };
 
-export const waitForUploadJob = async (jobId, onStatus) => {
-  const deadline = Date.now() + (20 * 60 * 1000);
-  let consecutivePollErrors = 0;
-  const maxConsecutivePollErrors = 8;
-  let pollDelayMs = 3000;
-
-  while (Date.now() < deadline) {
-    try {
-      const job = await getUploadJob(jobId);
-      consecutivePollErrors = 0;
-      pollDelayMs = 3000;
-      onStatus?.(job.status);
-
-      if (job.status === "completed") return job;
-      if (job.status === "failed") {
-        const error = new Error(job.error || "Không thể xử lý tài liệu.");
-        error.friendlyMessage = job.error;
-        throw error;
-      }
-    } catch (error) {
-      const status = error.response?.status;
-      if (status === 404) {
-        const jobMissingError = new Error("Upload job not found");
-        jobMissingError.friendlyMessage =
-          "Không tìm thấy tác vụ hoặc tài khoản hiện tại không có quyền xem. Hãy kiểm tra đăng nhập và Lịch sử trước khi tải lại file.";
-        throw jobMissingError;
-      }
-      if (status === 401 || status === 403) {
-        const authError = new Error("Upload job access denied");
-        authError.friendlyMessage = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi upload file.";
-        throw authError;
-      }
-      const isTransient =
-        error.code === "ECONNABORTED" ||
-        error.code === "ERR_NETWORK" ||
-        error.message?.includes("timeout") ||
-        status === 502 ||
-        status === 503 ||
-        status === 504;
-
-      if (!isTransient) {
-        throw error;
-      }
-
-      consecutivePollErrors += 1;
-      if (consecutivePollErrors >= maxConsecutivePollErrors) {
-        const unavailableError = new Error("Upload job polling unavailable");
-        unavailableError.friendlyMessage =
-          "Máy chủ đang khởi động lại hoặc đang xử lý tài liệu lớn. Hãy chờ ít phút, tải lại trang và kiểm tra Lịch sử; không cần upload lại ngay.";
-        throw unavailableError;
-      }
-      // Không dồn nhiều GET lên instance Render nhỏ trong lúc OCR/AI đang chạy.
-      pollDelayMs = Math.min(Math.round(pollDelayMs * 1.5), 12000);
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, pollDelayMs));
-  }
-
-  const error = new Error("Tài liệu vẫn đang được xử lý.");
-  error.friendlyMessage = "Tài liệu đang được xử lý lâu hơn dự kiến. Vui lòng mở lại Lịch sử sau ít phút.";
-  throw error;
-};
+export const waitForUploadJob = (jobId, onStatus, signal) =>
+  pollUploadJob(() => getUploadJob(jobId, signal), onStatus, { signal });
 
 /**
  * Lấy các tuỳ chọn bộ lọc (dropdown)

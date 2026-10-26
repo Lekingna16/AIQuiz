@@ -39,6 +39,7 @@ import atexit
 import logging
 import json
 import re
+from time import perf_counter
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from datetime import datetime, timezone
@@ -53,8 +54,8 @@ from app.services.text_extractor import (
     TextSegment,
     TextExtractor,
     extract_document_worker,
-    render_scan_worker,
 )
+from app.services.pdf_reader import GeminiPDFReader, split_pdf_batches, PDFReadError
 from app.services.ai_service import (
     DeepSeekService,
     DeepSeekServiceError,
@@ -106,6 +107,9 @@ class QuizService:
         self.db = db
         self.gemini = gemini_service
         settings = get_settings()
+        self.settings = settings
+        self.progress_callback = None
+        self.started_at = perf_counter()
         self.ai_vision_ocr = getattr(settings, "OCR_AI_VISION", True)
         self.extractor = TextExtractor(
             ocr=LocalOCREngine.from_settings(settings),
@@ -158,17 +162,27 @@ class QuizService:
 
         return await asyncio.to_thread(self.extractor.extract_document, file_bytes, file_type)
 
-    async def _render_scan_images(self, file_bytes: bytes) -> list[bytes]:
-        return await asyncio.get_running_loop().run_in_executor(
-            _get_ocr_process_pool(), render_scan_worker, file_bytes
+    async def _progress(self, stage, **details):
+        details["elapsed_seconds"] = round(perf_counter() - self.started_at, 1)
+        logger.info("Upload stage=%s progress=%s", stage, details)
+        if self.progress_callback is not None:
+            await self.progress_callback(stage, **details)
+
+    async def _read_scan_pdf(self, file_bytes):
+        reader = GeminiPDFReader(self.settings.GEMINI_API_KEY, self.settings.GEMINI_MODEL)
+        await self._progress("preparing_pdf")
+        batches = await asyncio.get_running_loop().run_in_executor(
+            _get_ocr_process_pool(), split_pdf_batches, file_bytes
         )
+        await self._progress("reading_pdf", completed_pages=0, total_pages=batches[-1][1])
+        return await reader.read(batches, self._progress)
 
     async def _extract_text(self, file_bytes: bytes, file_type: str, filename: str) -> str:
         """
         Trích xuất text cho mọi loại file.
 
-        1. PDF scan hoàn toàn → Gemini Vision đọc theo trang (khi được bật).
-        2. Nếu Vision lỗi/quota, dùng OCR cục bộ trong process riêng.
+        1. PDF scan hoàn toàn → Gemini đọc PDF gốc theo nhóm trang giới hạn.
+        2. Lỗi/quota được trả rõ ràng; không chạy lại toàn bộ bằng OCR cục bộ.
         3. PDF/DOCX có text layer luôn được parser trực tiếp, không gửi AI.
         """
         if (
@@ -176,23 +190,12 @@ class QuizService:
             and file_type.lower().strip() == "pdf"
             and await asyncio.to_thread(self.extractor.is_scan_only_pdf, file_bytes)
         ):
-            try:
-                page_images = await self._render_scan_images(file_bytes)
-                vision_text = await self.gemini.transcribe_scanned_pdf(page_images)
-                if vision_text and vision_text.strip():
-                    logger.info(
-                        "%s: Gemini Vision OCR completed for %d scanned pages",
-                        filename, len(page_images),
-                    )
-                    return self.extractor.finalize_text(
-                        ExtractionResult(file_type="pdf", segments=[
-                            TextSegment(text=vision_text, source="ocr")
-                        ])
-                    )
-            except Exception as exc:
-                # Không làm hỏng upload khi Vision tạm lỗi/quota; local OCR vẫn
-                # là dự phòng để người dùng nhận được kết quả thay vì timeout.
-                logger.warning("%s: Gemini Vision OCR failed, using local OCR: %s", filename, exc)
+            vision_text = await self._read_scan_pdf(file_bytes)
+            if not vision_text or not vision_text.strip():
+                raise PDFReadError("Gemini không trả nội dung đọc được từ PDF scan.")
+            return self.extractor.finalize_text(
+                ExtractionResult(file_type="pdf", segments=[TextSegment(text=vision_text, source="ocr")])
+            )
 
         result = await self._run_extractor_isolated(file_bytes, file_type)
 
@@ -254,6 +257,7 @@ class QuizService:
             # Step 1: Extract text
             # =====================
             logger.info(f"Extracting text from: {filename} ({file_type})")
+            await self._progress("extracting")
             extracted_text = await self._extract_text(file_bytes, file_type, filename)
 
             if not extracted_text.strip() and file_type.lower() in {"pdf", "docx"}:
@@ -300,6 +304,7 @@ class QuizService:
             )
             
             if mode == "extract":
+                await self._progress("parsing")
                 # =============================================
                 # Trích xuất bằng REGEX
                 # → Nhanh (~50ms), chính xác, lấy hết 100% câu
@@ -338,6 +343,7 @@ class QuizService:
                     questions_to_process = unsolved_questions
                     ai_solved = 0
                     if questions_to_process:
+                        await self._progress("solving", question_count=len(questions_to_process))
                         logger.info(
                             f"Calling AI answer solver for {len(questions_to_process)} questions "
                             f"(repair_ocr={needs_ocr_repair})..."
@@ -415,6 +421,7 @@ class QuizService:
                     }]
             else:
                 # Luôn dùng AI cho generate
+                await self._progress("generating")
                 quiz_data = await self.gemini.generate_quiz(
                     text=processed_text,
                     num_questions=num_questions,
@@ -428,6 +435,7 @@ class QuizService:
             # Step 5: Save quiz + questions to DB
             # =====================
             saved_quiz_ids = []
+            await self._progress("saving")
             for q_data in quiz_data_list:
                 qid, q_ids = await self._save_quiz_and_questions(
                     document_id=document_id,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, File, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -161,9 +161,26 @@ const FileUpload = ({ forcedMode }) => {
 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadPhase, setUploadPhase] = useState(""); // "uploading" | "processing" | ""
+  const [jobProgress, setJobProgress] = useState(null);
+  const pollController = useRef(null);
+  useEffect(() => () => pollController.current?.abort(), []);
+  const stageText = {
+    queued: 'Đang chờ lượt xử lý…',
+    extracting: 'Đang kiểm tra nội dung tài liệu…',
+    preparing_pdf: 'Đang chuẩn bị các trang PDF…',
+    reading_pdf: `Đã đọc ${jobProgress?.completed_pages ?? 0}/${jobProgress?.total_pages ?? '?'} trang`,
+    parsing: 'Đang tách và kiểm tra câu hỏi…',
+    solving: `Đang giải ${jobProgress?.question_count ?? ''} câu thiếu đáp án…`,
+    generating: 'Đang tạo câu hỏi…',
+    saving: 'Đang lưu bài quiz…',
+    reconnecting: 'Kết nối tạm gián đoạn. Đang chờ lấy lại tiến độ…',
+  }[jobProgress?.stage] || 'Đang xử lý tài liệu…';
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || pollController.current) return;
+    const controller = new AbortController();
+    pollController.current = controller;
+    setJobProgress(null);
     
     setIsUploading(true);
     setUploadProgress(0);
@@ -185,20 +202,23 @@ const FileUpload = ({ forcedMode }) => {
         // Upload progress callback
         (percent) => {
           setUploadProgress(percent);
-        }
+        },
+        controller.signal
       );
+      if (controller.signal.aborted) return;
       
       setUploadPhase("processing");
       toast.info("Máy chủ đã nhận file. Đang đọc tài liệu và tạo câu hỏi…", { duration: 8000 });
-      const result = await waitForUploadJob(job.job_id, (status) => {
-        if (status === "queued") setUploadPhase("processing");
-      });
+      const result = await waitForUploadJob(job.job_id, (_status, progress) => {
+        setJobProgress(progress);
+      }, controller.signal);
 
       toast.success("Tạo quiz thành công!");
       // Chuyển hướng tới trang làm quiz
       navigate(`/quiz/${result.quiz_id}`);
       
     } catch (error) {
+      if (controller.signal.aborted || error.code === 'ERR_CANCELED') return;
       let errorMsg = "Không thể tạo quiz. Vui lòng thử lại.";
 
       if (error.friendlyMessage) {
@@ -254,6 +274,7 @@ const FileUpload = ({ forcedMode }) => {
 
       toast.error(errorMsg, { duration: 8000 });
     } finally {
+      pollController.current = null;
       setIsUploading(false);
       setUploadProgress(0);
       setUploadPhase("");
@@ -416,7 +437,7 @@ const FileUpload = ({ forcedMode }) => {
             <span>
               {uploadPhase === "uploading" 
                 ? `Đang tải file lên... ${uploadProgress}%` 
-                : "⏳ Đang chuẩn bị bài quiz..."}
+                : stageText}
             </span>
             {uploadPhase === "processing" && (
               <span style={{ color: "var(--primary-color)" }}>Có thể mất vài phút</span>

@@ -93,8 +93,8 @@ class Settings(BaseSettings):
     OCR_MAX_PAGES: int = 24
     # Thư mục chứa *.traineddata; để trống → tự tìm (backend/tessdata, env, máy)
     TESSDATA_PREFIX: str | None = None
-    # Với PDF scan hoàn toàn, ưu tiên Gemini Vision để giữ chữ tiếng Việt và
-    # đủ các phương án; nếu Vision lỗi/quota thì quay về OCR cục bộ.
+    # PDF scan được gửi trực tiếp đến Gemini theo nhóm trang, không render ảnh.
+    # Khi quota/lỗi, trả lỗi rõ ràng thay vì tự chạy thêm OCR cục bộ.
     OCR_AI_VISION: bool = True
 
     # --- Authentication ---

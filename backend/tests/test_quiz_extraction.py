@@ -120,17 +120,16 @@ async def test_quiz_service_never_sends_pending_ocr_segments_to_ai():
 @pytest.mark.asyncio
 async def test_quiz_service_uses_gemini_vision_for_scan_only_pdf():
     gemini_mock = MagicMock()
-    gemini_mock.transcribe_scanned_pdf = AsyncMock(
-        return_value="=== PAGE 1 ===\nCâu 1: Nội dung scan?\nA. Một\nB. Hai\nC. Ba\nD. Bốn"
-    )
     service = QuizService(db=MagicMock(), gemini_service=gemini_mock)
     service.extractor.is_scan_only_pdf = MagicMock(return_value=True)
-    service._render_scan_images = AsyncMock(return_value=[b"jpeg-page"])
+    service._read_scan_pdf = AsyncMock(
+        return_value="Câu 1: Nội dung scan?\nA. Một\nB. Hai\nC. Ba\nD. Bốn"
+    )
     service._run_extractor_isolated = AsyncMock()
 
     final_text = await service._extract_text(b"%PDF-fake", "pdf", "scan.pdf")
 
-    gemini_mock.transcribe_scanned_pdf.assert_awaited_once_with([b"jpeg-page"])
+    service._read_scan_pdf.assert_awaited_once_with(b"%PDF-fake")
     service._run_extractor_isolated.assert_not_awaited()
     assert "Câu 1: Nội dung scan?" in final_text
     assert "D. Bốn" in final_text
@@ -153,6 +152,21 @@ async def test_quiz_service_runs_real_pdf_ocr_via_subprocess_worker():
     scan_doc.close()
 
     service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    service.ai_vision_ocr = False
     text = await service._extract_text(pdf_bytes, "pdf", "scan_worker.pdf")
     assert "subprocess" in text.lower()
     assert "A." in text and "D." in text
+
+
+@pytest.mark.asyncio
+async def test_pdf_quota_failure_does_not_restart_local_ocr():
+    from app.services.pdf_reader import PDFReadError
+
+    service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    service.ai_vision_ocr = True
+    service.extractor.is_scan_only_pdf = MagicMock(return_value=True)
+    service._read_scan_pdf = AsyncMock(side_effect=PDFReadError("quota"))
+    service._run_extractor_isolated = AsyncMock()
+    with pytest.raises(PDFReadError, match="quota"):
+        await service._extract_text(b"pdf", "pdf", "scan.pdf")
+    service._run_extractor_isolated.assert_not_awaited()

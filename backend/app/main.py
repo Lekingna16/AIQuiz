@@ -125,6 +125,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # Cho phép tất cả methods
     allow_headers=["*"],  # Cho phép tất cả headers
+    expose_headers=["Retry-After"],
 )
 
 

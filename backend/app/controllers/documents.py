@@ -66,10 +66,11 @@ router = APIRouter(
     tags=["Documents"],  # Nhóm trong Swagger UI
 )
 
-# Small Render instances should process one expensive AI request at a time.
-# Rejecting immediately is safer than allowing concurrent generations to
-# exhaust memory/CPU and make every request time out.
+# Small Render instances process one document pipeline at a time.
 _generation_semaphore = asyncio.Semaphore(1)
+# One active document and at most one waiting upload per API process. Reserve
+# before reading bytes so queued 50 MB files cannot accumulate in memory.
+_upload_reservations: set[ObjectId] = set()
 
 
 async def _generate_in_available_slot(quiz_service: QuizService, **kwargs):
@@ -142,6 +143,16 @@ def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:
 
 
 async def _process_upload_job(
+    *, reservation=None, **kwargs,
+) -> None:
+    try:
+        await _run_upload_job(**kwargs)
+    finally:
+        if reservation is not None:
+            _upload_reservations.discard(reservation)
+
+
+async def _run_upload_job(
     *,
     db: AsyncIOMotorDatabase,
     job_id: ObjectId,
@@ -151,21 +162,32 @@ async def _process_upload_job(
     options: dict,
 ) -> None:
     """Run the expensive extraction and AI generation after the upload responds."""
-    await db.upload_jobs.update_one(
-        {"_id": job_id},
-        {"$set": {"status": "processing", "started_at": datetime.now(timezone.utc)}},
-    )
+    async def progress(stage, **details):
+        # Progress reporting must not cause a successful AI read to be repeated.
+        try:
+            async with asyncio.timeout(2):
+                await db.upload_jobs.update_one(
+                    {"_id": job_id},
+                    {"$set": {"status": "processing", "stage": stage,
+                              "updated_at": datetime.now(timezone.utc), **details}},
+                )
+        except Exception:
+            logger.warning("Could not update progress for job %s", job_id)
 
     try:
         settings = get_settings()
         quiz_service = QuizService(db=db, gemini_service=_create_ai_service(settings))
-        result = await _generate_in_available_slot(
-            quiz_service,
-            file_bytes=file_bytes,
-            filename=filename,
-            file_type=file_type,
-            **options,
-        )
+        quiz_service.progress_callback = progress
+        # Includes queue wait, reading and answer solving. Never leave a live
+        # process polling indefinitely after provider retries.
+        async with asyncio.timeout(600):
+            result = await _generate_in_available_slot(
+                quiz_service,
+                file_bytes=file_bytes,
+                filename=filename,
+                file_type=file_type,
+                **options,
+            )
         await db.upload_jobs.update_one(
             {"_id": job_id},
             {"$set": {
@@ -176,6 +198,8 @@ async def _process_upload_job(
             }},
         )
         return
+    except TimeoutError:
+        error = "Xử lý tài liệu quá thời gian chờ. Vui lòng chia file nhỏ hơn và thử lại."
     except ValueError as exc:
         logger.info("Upload job %s rejected: %s", job_id, exc)
         error = str(exc)
@@ -281,6 +305,11 @@ async def get_upload_job(
         "status": job["status"],
         "quiz_id": job.get("quiz_id"),
         "error": job.get("error"),
+        "stage": job.get("stage", job["status"]),
+        "completed_pages": job.get("completed_pages"),
+        "total_pages": job.get("total_pages"),
+        "question_count": job.get("question_count"),
+        "elapsed_seconds": job.get("elapsed_seconds"),
     }
 
 @router.post(
@@ -364,11 +393,40 @@ async def upload_document(
     # =====================
     file_ext = _validate_file(file, settings.MAX_FILE_SIZE_BYTES)
 
+    if len(_upload_reservations) >= 2:
+        raise HTTPException(
+            status_code=429,
+            detail="Máy chủ đang xử lý đủ số tài liệu. Vui lòng đợi khoảng một phút rồi thử lại.",
+            headers={"Retry-After": "60"},
+        )
+    reservation = ObjectId()
+    _upload_reservations.add(reservation)
+    try:
+        return await _read_and_queue_upload(
+            background_tasks=background_tasks, db=db, file=file,
+            file_ext=file_ext, settings=settings, reservation=reservation,
+            options={
+                "num_questions": num_questions, "difficulty": difficulty.value,
+                "language": language, "mode": mode,
+                "user_id": str(current_user.id) if current_user else None,
+                "is_public": is_public, "subject": subject, "major": major,
+                "exam_type": exam_type, "school": school,
+            },
+        )
+    except BaseException:
+        _upload_reservations.discard(reservation)
+        raise
+
+
+async def _read_and_queue_upload(
+    *, background_tasks, db, file, file_ext, settings, reservation, options,
+):
+
     # =====================
     # Step 2: Read file content & validate size
     # =====================
     try:
-        file_bytes = await file.read()
+        file_bytes = await file.read(settings.MAX_FILE_SIZE_BYTES + 1)
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -395,7 +453,8 @@ async def upload_document(
     # Queue expensive OCR and AI generation after responding to the browser.
     job = {
         "status": "queued",
-        "user_id": str(current_user.id) if current_user else None,
+        "stage": "queued",
+        "user_id": options["user_id"],
         "original_filename": file.filename,
         "created_at": datetime.now(timezone.utc),
     }
@@ -404,22 +463,12 @@ async def upload_document(
 
     background_tasks.add_task(
         _process_upload_job,
+        reservation=reservation,
         db=db,
         job_id=job_id,
         file_bytes=file_bytes,
         filename=file.filename,
         file_type=file_ext,
-        options={
-            "num_questions": num_questions,
-            "difficulty": difficulty.value,
-            "language": language,
-            "mode": mode,
-            "user_id": str(current_user.id) if current_user else None,
-            "is_public": is_public,
-            "subject": subject,
-            "major": major,
-            "exam_type": exam_type,
-            "school": school,
-        },
+        options=options,
     )
     return {"job_id": str(job_id), "status": "queued"}
