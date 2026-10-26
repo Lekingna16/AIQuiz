@@ -170,3 +170,32 @@ async def test_pdf_quota_failure_does_not_restart_local_ocr():
     with pytest.raises(PDFReadError, match="quota"):
         await service._extract_text(b"pdf", "pdf", "scan.pdf")
     service._run_extractor_isolated.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider, pages_per_batch", [("deepseek", 1), ("gemini", 4)])
+async def test_scan_reader_uses_explicit_ocr_provider(provider, pages_per_batch):
+    import asyncio
+    from types import SimpleNamespace
+
+    service = QuizService(db=MagicMock(), gemini_service=MagicMock())
+    service.settings = SimpleNamespace(
+        AI_PROVIDER="gemini", OCR_PROVIDER=provider,
+        DEEPSEEK_API_KEY="deepseek-test", DEEPSEEK_VISION_MODEL="deepseek-flash",
+        GEMINI_API_KEY="gemini-test", GEMINI_MODEL="gemini-test-model",
+    )
+    batches = [(1, 1, b"page")]
+    reader = MagicMock()
+    reader.read = AsyncMock(return_value="Câu 1: Nội dung")
+    loop = asyncio.get_running_loop()
+    with (
+        patch("app.services.quiz_service.DeepSeekPDFReader", return_value=reader) as deepseek,
+        patch("app.services.quiz_service.GeminiPDFReader", return_value=reader) as gemini,
+        patch("app.services.quiz_service._get_ocr_process_pool", return_value="pool"),
+        patch.object(loop, "run_in_executor", new=AsyncMock(return_value=batches)) as prepare,
+    ):
+        assert await service._read_scan_pdf(b"pdf") == "Câu 1: Nội dung"
+    assert prepare.await_args.args[-1] == pages_per_batch
+    assert deepseek.call_count == (provider == "deepseek")
+    assert gemini.call_count == (provider == "gemini")
+    reader.read.assert_awaited_once_with(batches, service._progress)

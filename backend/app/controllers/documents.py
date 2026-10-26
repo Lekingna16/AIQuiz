@@ -105,11 +105,14 @@ def _create_ai_service(settings) -> DeepSeekService | FailoverAIService:
         if fallback_key and not fallback_key.startswith("your_"):
             return FailoverAIService(
                 primary=primary,
-                fallback=DeepSeekService(api_key=fallback_key),
+                fallback=DeepSeekService(api_key=fallback_key, model=getattr(settings, "DEEPSEEK_MODEL", "deepseek-flash")),
             )
         return primary
 
-    return DeepSeekService(api_key=getattr(settings, "DEEPSEEK_API_KEY", None))
+    return DeepSeekService(
+        api_key=getattr(settings, "DEEPSEEK_API_KEY", None),
+        model=getattr(settings, "DEEPSEEK_MODEL", "deepseek-flash"),
+    )
 
 
 def _validate_file(file: UploadFile, max_size_bytes: int) -> tuple[str, bytes]:

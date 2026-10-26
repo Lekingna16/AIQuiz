@@ -55,7 +55,9 @@ from app.services.text_extractor import (
     TextExtractor,
     extract_document_worker,
 )
-from app.services.pdf_reader import GeminiPDFReader, split_pdf_batches, PDFReadError
+from app.services.pdf_reader import (
+    GeminiPDFReader, DeepSeekPDFReader, split_pdf_batches, PDFReadError,
+)
 from app.services.ai_service import (
     DeepSeekService,
     DeepSeekServiceError,
@@ -169,10 +171,20 @@ class QuizService:
             await self.progress_callback(stage, **details)
 
     async def _read_scan_pdf(self, file_bytes):
-        reader = GeminiPDFReader(self.settings.GEMINI_API_KEY, self.settings.GEMINI_MODEL)
+        provider = self.settings.OCR_PROVIDER
+        if provider == "deepseek":
+            reader = DeepSeekPDFReader(
+                self.settings.DEEPSEEK_API_KEY, self.settings.DEEPSEEK_VISION_MODEL,
+                executor=_get_ocr_process_pool(),
+            )
+            pages_per_batch = 1
+        else:
+            reader = GeminiPDFReader(self.settings.GEMINI_API_KEY, self.settings.GEMINI_MODEL)
+            pages_per_batch = 4
+        logger.info("Scan reader provider=%s model=%s", provider, reader.model)
         await self._progress("preparing_pdf")
         batches = await asyncio.get_running_loop().run_in_executor(
-            _get_ocr_process_pool(), split_pdf_batches, file_bytes
+            _get_ocr_process_pool(), split_pdf_batches, file_bytes, pages_per_batch
         )
         await self._progress("reading_pdf", completed_pages=0, total_pages=batches[-1][1])
         return await reader.read(batches, self._progress)
@@ -181,7 +193,7 @@ class QuizService:
         """
         Trích xuất text cho mọi loại file.
 
-        1. PDF scan hoàn toàn → Gemini đọc PDF gốc theo nhóm trang giới hạn.
+        1. PDF scan hoàn toàn → dịch vụ OCR được cấu hình đọc theo nhóm trang giới hạn.
         2. Lỗi/quota được trả rõ ràng; không chạy lại toàn bộ bằng OCR cục bộ.
         3. PDF/DOCX có text layer luôn được parser trực tiếp, không gửi AI.
         """
@@ -192,7 +204,7 @@ class QuizService:
         ):
             vision_text = await self._read_scan_pdf(file_bytes)
             if not vision_text or not vision_text.strip():
-                raise PDFReadError("Gemini không trả nội dung đọc được từ PDF scan.")
+                raise PDFReadError("Dịch vụ OCR không trả nội dung đọc được từ PDF scan.")
             return self.extractor.finalize_text(
                 ExtractionResult(file_type="pdf", segments=[TextSegment(text=vision_text, source="ocr")])
             )

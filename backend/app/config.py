@@ -58,12 +58,11 @@ class Settings(BaseSettings):
     MONGODB_URL: str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "aiquiz"
 
-    # --- Google Gemini ---
-    # API Key lấy từ: https://aistudio.google.com/apikey
-    # Gemini uses the OpenAI-compatible endpoint. Keep DeepSeek as an
-    # optional fallback so existing deployments continue to start.
+    # --- AI: DeepSeek is the default for generation and scan transcription ---
     AI_PROVIDER: str = "deepseek"
     DEEPSEEK_API_KEY: str | None = None
+    DEEPSEEK_MODEL: str = "deepseek-flash"
+    DEEPSEEK_VISION_MODEL: str = "deepseek-flash"
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-3.8-flash"
 
@@ -93,9 +92,17 @@ class Settings(BaseSettings):
     OCR_MAX_PAGES: int = 24
     # Thư mục chứa *.traineddata; để trống → tự tìm (backend/tessdata, env, máy)
     TESSDATA_PREFIX: str | None = None
-    # PDF scan được gửi trực tiếp đến Gemini theo nhóm trang, không render ảnh.
-    # Khi quota/lỗi, trả lỗi rõ ràng thay vì tự chạy thêm OCR cục bộ.
+    # Independent from answer generation; never silently call Gemini on quota.
+    OCR_PROVIDER: str = "deepseek"
     OCR_AI_VISION: bool = True
+
+    @field_validator("OCR_PROVIDER")
+    @classmethod
+    def validate_ocr_provider(cls, value: str) -> str:
+        provider = value.strip().lower()
+        if provider not in {"deepseek", "gemini"}:
+            raise ValueError("OCR_PROVIDER must be either 'deepseek' or 'gemini'.")
+        return provider
 
     # --- Authentication ---
     # Google OAuth2 Client ID

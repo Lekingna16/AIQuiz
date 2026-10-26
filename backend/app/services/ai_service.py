@@ -175,7 +175,7 @@ class DeepSeekService:
         api_key: str,
         *,
         base_url: str = "https://api.deepseek.com",
-        model: str = "deepseek-chat",
+        model: str = "deepseek-flash",
         provider_name: str = "DeepSeek",
     ):
         """
@@ -477,6 +477,8 @@ Return ONLY a valid JSON object matching this structure:
                     # 4k output tokens are sufficient for the allowed quiz
                     # sizes while finishing reliably behind a web proxy.
                     max_tokens=4096,
+                    **({"extra_body": {"thinking": {"type": "disabled"}}}
+                       if self.provider_name == "DeepSeek" else {}),
                 ),
                 timeout=90,
             )
