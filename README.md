@@ -1,10 +1,49 @@
 # AIQuiz
 
-AIQuiz là ứng dụng web tạo và trích xuất bài trắc nghiệm từ tài liệu. Người dùng có thể tải lên PDF, DOCX hoặc TXT; hệ thống đọc nội dung, nhận diện đề scan, tách câu hỏi và phương án A–D, giải những câu chưa có đáp án rồi tạo thành quiz có thể làm trực tiếp trên trình duyệt.
+> Biến tài liệu học tập thành bài trắc nghiệm trực tuyến với sự hỗ trợ của AI.
 
-Ứng dụng tập trung vào tài liệu tiếng Việt và các đề thi có bố cục phức tạp: phương án nằm trên một dòng, bảng 2 cột × 2 hàng, ảnh chụp nhiều trang, chữ viết tay chồng lên đáp án và PDF chứa lớp OCR cũ bị lỗi.
+🌐 **Trải nghiệm ứng dụng:** [https://ai-quiz-blush.vercel.app](https://ai-quiz-blush.vercel.app)
 
-> Demo frontend: [ai-quiz-blush.vercel.app](https://ai-quiz-blush.vercel.app)
+## Giới thiệu
+
+AIQuiz là nền tảng học tập và chia sẻ tài nguyên trắc nghiệm thông minh. Thay vì nhập thủ công từng câu hỏi, người dùng chỉ cần tải lên tài liệu PDF, DOCX hoặc TXT. Hệ thống sẽ đọc nội dung, nhận diện câu hỏi và các phương án A–D, sau đó tạo thành một bài quiz có thể làm ngay trên trình duyệt.
+
+AIQuiz được xây dựng hướng đến tài liệu tiếng Việt, đặc biệt là các đề thi scan có bố cục phức tạp như đáp án trình bày theo hai cột, nội dung xuống nhiều dòng, chữ viết tay chồng lên văn bản hoặc lớp OCR có sẵn bị sai.
+
+## Tổng quan dự án
+
+AIQuiz cung cấp hai cách tạo bài trắc nghiệm:
+
+- **Trích xuất đề có sẵn:** giữ lại câu hỏi và phương án trong tài liệu gốc, phù hợp khi số hóa đề thi.
+- **Sinh câu hỏi bằng AI:** phân tích nội dung bài học và tự động tạo bộ câu hỏi mới để ôn tập.
+
+Sau khi xử lý tài liệu, người dùng có thể làm bài, kiểm tra từng câu, nộp bài để chấm điểm và xem lại lịch sử. Các quiz công khai được hiển thị trong kho tài nguyên cộng đồng và có thể lọc theo môn học hoặc kỳ thi.
+
+## AIQuiz dành cho ai?
+
+- **Học sinh, sinh viên:** chuyển giáo trình và đề cương thành quiz để tự ôn tập.
+- **Giáo viên, giảng viên:** số hóa đề thi, tạo nhanh bộ câu hỏi và chia sẻ tài nguyên.
+- **Người tự học:** luyện tập kiến thức từ tài liệu cá nhân mà không phải nhập câu hỏi thủ công.
+- **Nhóm học tập:** xây dựng kho đề chung và làm bài trực tiếp trên nhiều thiết bị.
+
+## Cách sử dụng
+
+1. Đăng nhập bằng tài khoản Google hoặc truy cập kho quiz công khai.
+2. Chọn **Upload tài liệu** để trích xuất đề có sẵn, hoặc **Sinh câu hỏi bằng AI** để tạo bài tập mới.
+3. Tải lên một file PDF, DOCX hoặc TXT và điền thông tin môn học, kỳ thi nếu cần.
+4. Theo dõi tiến trình đọc tài liệu, OCR và tạo quiz.
+5. Kiểm tra nội dung được nhận diện, bắt đầu làm bài và nộp bài để xem kết quả.
+
+## Các màn hình chính
+
+| Màn hình | Chức năng |
+|---|---|
+| Trang chủ | Xem kho quiz cộng đồng và lọc theo môn học, kỳ thi |
+| Upload tài liệu | Trích xuất câu hỏi trắc nghiệm có sẵn từ tài liệu |
+| Sinh câu hỏi | Dùng AI tạo bài trắc nghiệm mới từ nội dung học tập |
+| Làm bài | Chọn đáp án, kiểm tra từng câu và chuyển giữa các câu hỏi |
+| Kết quả | Xem điểm số, số câu đúng/sai và đáp án |
+| Lịch sử | Xem lại các lần làm bài trước đây |
 
 ## Tính năng chính
 
@@ -72,217 +111,9 @@ flowchart LR
 | OCR | Tesseract qua PyMuPDF, `vie+eng` traineddata |
 | AI | DeepSeek hoặc Google Gemini |
 | Xác thực | Google OAuth 2.0, JWT |
-| Kiểm thử | Pytest, pytest-asyncio, Vitest, Testing Library |
-| Triển khai | Vercel (frontend), backend tương thích Render/Uvicorn |
+| Triển khai | Vercel, Render |
 
-## Cấu trúc thư mục
+---
 
-```text
-AIQuiz/
-├── backend/
-│   ├── app/
-│   │   ├── controllers/       # REST API: auth, documents, quizzes
-│   │   ├── models/            # Pydantic models
-│   │   ├── repositories/      # Truy cập dữ liệu danh mục
-│   │   ├── services/          # OCR, AI, đọc PDF, orchestration
-│   │   ├── utils/             # Parser câu hỏi, kiểm tra chất lượng, text processing
-│   │   ├── config.py          # Cấu hình từ biến môi trường
-│   │   ├── database.py        # Kết nối MongoDB
-│   │   └── main.py            # FastAPI entry point
-│   ├── scripts/               # Tải tessdata, kiểm tra scan, import dữ liệu
-│   ├── tests/                 # Backend test suite
-│   ├── .env.example
-│   └── requirements.txt
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── services/          # API client và upload polling
-│   │   ├── store/             # Trạng thái đăng nhập
-│   │   └── views/             # Trang chủ, upload, quiz, lịch sử
-│   ├── package.json
-│   └── vercel.json
-└── README.md
-```
-
-## Yêu cầu hệ thống
-
-- Python 3.11 trở lên.
-- Node.js 20 trở lên và npm.
-- MongoDB local hoặc MongoDB Atlas.
-- API key DeepSeek hoặc Gemini nếu sử dụng AI/Vision OCR.
-
-## Cài đặt và chạy local
-
-### 1. Clone repository
-
-```bash
-git clone git@github.com:Lekingna16/AIQuiz.git
-cd AIQuiz
-```
-
-### 2. Khởi động backend
-
-Trên Windows PowerShell:
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env
-python scripts/download_tessdata.py
-uvicorn app.main:app --reload --port 8000
-```
-
-Trên macOS/Linux:
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python scripts/download_tessdata.py
-uvicorn app.main:app --reload --port 8000
-```
-
-Backend chạy tại `http://localhost:8000`. Tài liệu API:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-- Health check: `http://localhost:8000/health`
-
-### 3. Cấu hình backend
-
-Chỉnh `backend/.env`:
-
-```dotenv
-DEBUG=true
-
-MONGODB_URL=mongodb://localhost:27017
-MONGODB_DB_NAME=aiquiz
-
-AI_PROVIDER=deepseek
-DEEPSEEK_API_KEY=your_deepseek_api_key
-DEEPSEEK_MODEL=deepseek-flash
-DEEPSEEK_VISION_MODEL=deepseek-flash
-
-# Có thể dùng Gemini cho AI hoặc OCR
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=your_gemini_model
-
-OCR_ENABLED=true
-OCR_LANGUAGES=vie+eng
-OCR_DPI=250
-OCR_MAX_PAGES=24
-OCR_PROVIDER=deepseek
-OCR_AI_VISION=true
-EXTRACT_AI_FALLBACK=true
-
-GOOGLE_CLIENT_ID=your_google_client_id
-JWT_SECRET_KEY=replace_with_a_long_random_secret
-FRONTEND_URL=http://localhost:5173
-```
-
-`AI_PROVIDER` điều khiển model sinh/giải câu hỏi. `OCR_PROVIDER` điều khiển model đọc ảnh scan; hai giá trị có thể cấu hình độc lập thành `deepseek` hoặc `gemini`.
-
-### 4. Khởi động frontend
-
-Mở terminal mới:
-
-```bash
-cd frontend
-npm ci
-```
-
-Tạo `frontend/.env.local`:
-
-```dotenv
-VITE_API_URL=http://localhost:8000
-VITE_GOOGLE_CLIENT_ID=your_google_client_id
-```
-
-Sau đó chạy:
-
-```bash
-npm run dev
-```
-
-Frontend chạy tại `http://localhost:5173`.
-
-## API chính
-
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| `POST` | `/api/documents/upload` | Upload tài liệu và tạo job xử lý |
-| `GET` | `/api/documents/jobs/{job_id}` | Theo dõi trạng thái upload/OCR |
-| `GET` | `/api/documents/me` | Danh sách tài liệu của người dùng |
-| `DELETE` | `/api/documents/{document_id}` | Xóa tài liệu và các quiz liên quan |
-| `GET` | `/api/quizzes` | Danh sách quiz công khai |
-| `GET` | `/api/quizzes/filters` | Dữ liệu bộ lọc và danh mục |
-| `GET` | `/api/quizzes/{quiz_id}` | Chi tiết quiz để làm bài |
-| `POST` | `/api/quizzes/{quiz_id}/questions/{question_id}/check` | Kiểm tra một đáp án |
-| `POST` | `/api/quizzes/{quiz_id}/submit` | Nộp bài và chấm điểm |
-| `GET` | `/api/quizzes/attempts/me` | Lịch sử làm bài |
-| `POST` | `/api/auth/google` | Đăng nhập bằng Google |
-| `GET` | `/api/auth/me` | Thông tin người dùng hiện tại |
-
-## Kiểm thử
-
-Backend:
-
-```bash
-cd backend
-python -m pytest
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm test
-npm run lint
-npm run build
-```
-
-## Triển khai
-
-### Backend
-
-Thiết lập các biến trong `backend/.env.example` trên nền tảng triển khai. Build command tham khảo:
-
-```bash
-pip install -r requirements.txt && python scripts/download_tessdata.py
-```
-
-Start command:
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
-### Frontend
-
-Đặt thư mục root là `frontend`, khai báo `VITE_API_URL` và `VITE_GOOGLE_CLIENT_ID`, sau đó dùng:
-
-```bash
-npm ci && npm run build
-```
-
-Thư mục output là `frontend/dist`. File `vercel.json` đã cấu hình rewrite cho React Router.
-
-## Lưu ý về OCR và quyền riêng tư
-
-- Chất lượng nhận diện phụ thuộc độ nét, góc chụp, độ tương phản và mức độ chữ viết tay che nội dung.
-- Khi `OCR_AI_VISION=true`, ảnh từ trang scan có thể được gửi tới nhà cung cấp được chọn trong `OCR_PROVIDER`. Chỉ bật tính năng này khi phù hợp với yêu cầu bảo mật của dữ liệu.
-- Hệ thống không tự phát minh phần chữ bị che hoàn toàn. Câu vẫn thiếu một trong bốn phương án sau khi đọc lại sẽ được bỏ riêng và ghi nhận trong mô tả quiz.
-- Không commit file `.env`, API key, JWT secret hoặc thông tin kết nối MongoDB lên GitHub.
-
-## Đóng góp
-
-1. Fork repository và tạo branch cho thay đổi.
-2. Viết hoặc cập nhật test cho hành vi mới.
-3. Chạy test backend/frontend và kiểm tra build.
-4. Mở pull request, mô tả rõ lỗi, cách tái hiện và kết quả sau khi sửa.
+🌐 **Bắt đầu sử dụng AIQuiz tại:** [ai-quiz-blush.vercel.app](https://ai-quiz-blush.vercel.app)
 
