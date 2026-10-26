@@ -1,5 +1,6 @@
 # Environment variables (QUAN TRỌNG - không commit API keys)
 .env
+.env.example
 
 # Python
 __pycache__/
